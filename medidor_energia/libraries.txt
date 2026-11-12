@@ -1,0 +1,4 @@
+# Bibliotecas usadas pelo firmware (formato do Wokwi; na Arduino IDE, instale pelo Gerenciador de Bibliotecas)
+PubSubClient
+ArduinoJson
+LiquidCrystal I2C

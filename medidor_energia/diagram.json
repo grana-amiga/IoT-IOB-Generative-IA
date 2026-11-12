@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "author": "Grana Amiga - GS 2026/2 CitizenTech",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": 60,
+      "left": 340,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd1",
+      "top": 20,
+      "left": 510,
+      "attrs": {
+        "pins": "i2c"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot1",
+      "top": 20,
+      "left": 150,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-rgb-led",
+      "id": "rgb1",
+      "top": 100,
+      "left": 10,
+      "attrs": {
+        "common": "cathode"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 151,
+      "left": 105,
+      "attrs": {
+        "value": "220"
+      },
+      "rotate": 0
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 170,
+      "left": 105,
+      "attrs": {
+        "value": "220"
+      },
+      "rotate": 0
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r3",
+      "top": 189,
+      "left": 105,
+      "attrs": {
+        "value": "220"
+      },
+      "rotate": 0
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "bz1",
+      "top": 275,
+      "left": 90,
+      "attrs": {
+        "volume": "0.2"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 230,
+      "left": 515,
+      "attrs": {
+        "color": "blue",
+        "label": "Tela / Silenciar"
+      }
+    },
+    {
+      "type": "wokwi-slide-switch",
+      "id": "sw1",
+      "top": 225,
+      "left": 200,
+      "attrs": {
+        "value": "0"
+      }
+    }
+  ],
+  "connections": [
+    ["esp:TX", "$serialMonitor:RX", "", []],
+    ["esp:RX", "$serialMonitor:TX", "", []],
+    ["pot1:VCC", "esp:3V3", "red", []],
+    ["pot1:GND", "esp:GND.1", "black", []],
+    ["pot1:SIG", "esp:34", "orange", []],
+    ["lcd1:VCC", "esp:5V", "red", []],
+    ["lcd1:GND", "esp:GND.2", "black", []],
+    ["lcd1:SDA", "esp:21", "green", []],
+    ["lcd1:SCL", "esp:22", "blue", []],
+    ["esp:25", "r1:2", "red", []],
+    ["r1:1", "rgb1:R", "red", []],
+    ["esp:26", "r2:2", "green", []],
+    ["r2:1", "rgb1:G", "green", []],
+    ["esp:27", "r3:2", "blue", []],
+    ["r3:1", "rgb1:B", "blue", []],
+    ["rgb1:COM", "esp:GND.3", "black", []],
+    ["bz1:2", "esp:13", "purple", []],
+    ["bz1:1", "esp:GND.1", "black", []],
+    ["btn1:1.r", "esp:4", "gray", []],
+    ["btn1:2.r", "esp:GND.1", "black", []],
+    ["sw1:2", "esp:14", "yellow", []],
+    ["sw1:3", "esp:GND.1", "black", []]
+  ],
+  "dependencies": {}
+}

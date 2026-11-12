@@ -219,7 +219,7 @@ docker run --rm eclipse-mosquitto:2.0.20 mosquitto_pub -h broker.hivemq.com -t g
 | **Cálculo na borda** | Mandar a leitura bruta para a nuvem | O LCD/LED funcionam sem internet e a rede só transporta ~390 bytes a cada 5 s |
 | **MQTT** | HTTP direto do ESP32 para a API | Conexão persistente, cabeçalho mínimo, publish/subscribe (vários consumidores), **Last Will** para detectar queda e comando no sentido contrário sem o ESP32 precisar ser servidor |
 | **JSON** | Texto livre, binário | Legível por qualquer sistema (Node-RED, Java, Flutter) e com os mesmos nomes do banco |
-| **Node-RED** | Código próprio em Java | Visto em aula, visual e rápido para validar, gerar dashboard e fazer ponte MQTT → HTTP; roda em container na mesma VM da API |
+| **Node-RED** | Código próprio em Java | Indicado pelo professor e já conhecido pelo grupo (usado no ano anterior na disciplina de Inteligência Artificial e Chatbot); visual e rápido para validar, gerar dashboard e fazer ponte MQTT → HTTP; roda em container na mesma VM da API |
 | **Buffer + `seq`** | Confiar só no QoS | A PubSubClient só publica com QoS 0; o `seq` mostra perdas e o buffer recupera quedas |
 | **Wokwi** | Tinkercad (usado nas aulas) | O Tinkercad não tem ESP32 nem Wi-Fi e a simulação não acessa a internet, então a parte de rede teria de ser fingida. O Wokwi simula o ESP32 com Wi-Fi de verdade: as mensagens chegaram ao broker público e ao Node-RED |
 

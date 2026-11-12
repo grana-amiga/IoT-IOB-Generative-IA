@@ -1,0 +1,1049 @@
+[
+  {
+    "id": "flow_medidor",
+    "type": "tab",
+    "label": "Grana Amiga - Medidor de energia",
+    "disabled": false,
+    "info": "Recebe as leituras do medidor ESP32 via MQTT, valida, calcula métricas de entrega, mostra no dashboard (/ui), grava CSV e faz a ponte HTTP para a API Java."
+  },
+  {
+    "id": "broker",
+    "type": "mqtt-broker",
+    "name": "Broker MQTT",
+    "broker": "${MQTT_HOST}",
+    "port": "${MQTT_PORT}",
+    "clientid": "",
+    "autoConnect": true,
+    "usetls": false,
+    "protocolVersion": "4",
+    "keepalive": "60",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "birthQos": "0",
+    "birthPayload": "",
+    "birthMsg": {},
+    "closeTopic": "",
+    "closeQos": "0",
+    "closePayload": "",
+    "closeMsg": {},
+    "willTopic": "",
+    "willQos": "0",
+    "willPayload": "",
+    "willMsg": {},
+    "userProps": "",
+    "sessionExpiry": ""
+  },
+  {
+    "id": "tab_grana",
+    "type": "ui_tab",
+    "name": "Grana Amiga - Energia",
+    "icon": "dashboard",
+    "order": 1,
+    "disabled": false,
+    "hidden": false
+  },
+  {
+    "id": "g_agora",
+    "type": "ui_group",
+    "name": "Conta de luz do mês",
+    "tab": "tab_grana",
+    "order": 1,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "g_grafico",
+    "type": "ui_group",
+    "name": "Potência agora",
+    "tab": "tab_grana",
+    "order": 2,
+    "disp": true,
+    "width": "12",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "g_rede",
+    "type": "ui_group",
+    "name": "Medidor e rede",
+    "tab": "tab_grana",
+    "order": 3,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "g_config",
+    "type": "ui_group",
+    "name": "Ajustar medidor (app → ESP32)",
+    "tab": "tab_grana",
+    "order": 4,
+    "disp": true,
+    "width": "6",
+    "collapse": false,
+    "className": ""
+  },
+  {
+    "id": "c1",
+    "type": "comment",
+    "name": "1) Leituras do medidor (a cada 5 s)",
+    "info": "Tópico granaamiga/casa/<codigo>/energia. Payload JSON publicado pelo ESP32.",
+    "x": 170,
+    "y": 40,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "in_energia",
+    "type": "mqtt in",
+    "name": "granaamiga/casa/+/energia",
+    "topic": "granaamiga/casa/+/energia",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 100,
+    "wires": [
+      [
+        "fn_validar"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_validar",
+    "type": "function",
+    "name": "Validar leitura + métricas",
+    "func": "\n// Valida o JSON do medidor e calcula as métricas de entrega (evidências de teste)\nconst p = msg.payload;\nif (typeof p !== 'object' || p === null) {\n    msg.erro = 'payload não é JSON';\n    return [null, msg];\n}\nconst obrigatorios = ['codigo', 'seq', 'potencia_w', 'kwh', 'custo_estimado',\n                      'meta_mensal_reais', 'percentual_meta', 'faixa'];\nconst faltando = obrigatorios.filter(c => p[c] === undefined || p[c] === null);\nif (faltando.length) {\n    msg.erro = 'campos ausentes: ' + faltando.join(', ');\n    return [null, msg];\n}\nif (p.potencia_w < 0 || p.kwh < 0 || !['VERDE', 'AMARELO', 'VERMELHO'].includes(p.faixa)) {\n    msg.erro = 'valores fora do esperado';\n    return [null, msg];\n}\n\n// ---- Métricas por medidor ----\nconst todas = flow.get('metricas') || {};\nlet m = todas[p.codigo];\n// seq = 1 sem ser reenvio = medidor reiniciou: recomeça a contagem\nif (!m || (p.seq === 1 && !p.reenvio)) {\n    m = { recebidas: 0, unicas: 0, duplicadas: 0, reenvios: 0, maiorSeq: 0,\n          vistos: {}, somaAtrasoAoVivo: 0, qtdAoVivo: 0, maiorAtrasoReenvio: 0 };\n}\nm.recebidas++;\nif (m.vistos[p.seq]) {\n    m.duplicadas++;\n} else {\n    m.vistos[p.seq] = true;\n    m.unicas++;\n}\nif (p.reenvio) m.reenvios++;\nif (p.seq > m.maiorSeq) m.maiorSeq = p.seq;\n\n// Atraso = hora de chegada - hora da leitura (o relógio do ESP32 vem do NTP)\nlet atraso = null;\nif (p.dt_leitura) {\n    atraso = Math.max(0, (Date.now() - Date.parse(p.dt_leitura)) / 1000);\n    if (p.reenvio) {\n        m.maiorAtrasoReenvio = Math.max(m.maiorAtrasoReenvio, atraso);\n    } else {\n        m.somaAtrasoAoVivo += atraso;\n        m.qtdAoVivo++;\n    }\n}\n\nconst perdidas = Math.max(0, m.maiorSeq - m.unicas);\ntodas[p.codigo] = m;\nflow.set('metricas', todas);\n\nmsg.metricas = {\n    recebidas: m.recebidas,\n    perdidas: perdidas,\n    duplicadas: m.duplicadas,\n    reenvios: m.reenvios,\n    taxaEntrega: m.maiorSeq ? (100 * m.unicas / m.maiorSeq).toFixed(1) : '100.0',\n    atrasoMedioAoVivo: m.qtdAoVivo ? (m.somaAtrasoAoVivo / m.qtdAoVivo).toFixed(1) : '-',\n    maiorAtrasoReenvio: m.maiorAtrasoReenvio.toFixed(0)\n};\nmsg.atraso_s = atraso;\nnode.status({ fill: 'green', shape: 'dot',\n              text: `#${p.seq} ${p.faixa} · entrega ${msg.metricas.taxaEntrega}%` });\nreturn [msg, null];\n",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "Saída 1: leitura válida. Saída 2: leitura rejeitada (msg.erro).",
+    "x": 450,
+    "y": 100,
+    "wires": [
+      [
+        "fn_dash",
+        "fn_api",
+        "fn_csv",
+        "dbg_leitura"
+      ],
+      [
+        "dbg_invalida"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "dbg_invalida",
+    "type": "debug",
+    "name": "Leitura inválida",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "erro",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 720,
+    "y": 160,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "dbg_leitura",
+    "type": "debug",
+    "name": "Leitura válida",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "counter",
+    "x": 720,
+    "y": 40,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_dash",
+    "type": "function",
+    "name": "Formatar para o dashboard",
+    "func": "\nconst p = msg.payload;\nconst m = msg.metricas;\nconst brl = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',');\nconst cor = { VERDE: '#2e7d32', AMARELO: '#f9a825', VERMELHO: '#c62828' }[p.faixa];\nreturn [\n    { payload: Number(p.percentual_meta) },\n    p.reenvio ? null : { topic: 'Potência (W)', payload: Number(p.potencia_w) },\n    { payload: `${brl(p.custo_estimado)} de ${brl(p.meta_mensal_reais)}` },\n    { payload: `<b style=\"color:${cor}\">${p.faixa}</b>` },\n    { payload: brl(p.projecao_mes) + (p.alerta_projecao ? ' ⚠ vai passar da meta' : '') },\n    { payload: `dia ${p.dia_ciclo}/30 · ${Number(p.kwh).toFixed(2).replace('.', ',')} kWh` },\n    { payload: `${m.recebidas} recebidas · ${m.perdidas} perdidas · ${m.reenvios} reenviadas` },\n    { payload: `${m.taxaEntrega}% · atraso médio ${m.atrasoMedioAoVivo} s` },\n    { payload: `${p.buffer_pendente} no buffer · maior atraso de reenvio ${m.maiorAtrasoReenvio} s` }\n];\n",
+    "outputs": 9,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 750,
+    "y": 240,
+    "wires": [
+      [
+        "w_gauge"
+      ],
+      [
+        "w_chart"
+      ],
+      [
+        "t_custo"
+      ],
+      [
+        "t_faixa"
+      ],
+      [
+        "t_prev"
+      ],
+      [
+        "t_kwh"
+      ],
+      [
+        "t_msgs"
+      ],
+      [
+        "t_entrega"
+      ],
+      [
+        "t_buffer"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "w_gauge",
+    "type": "ui_gauge",
+    "name": "% da meta",
+    "group": "g_agora",
+    "order": 1,
+    "width": 6,
+    "height": 4,
+    "gtype": "gage",
+    "title": "Quanto da meta já foi usado",
+    "label": "% da meta",
+    "format": "{{value | number:0}}%",
+    "min": 0,
+    "max": "150",
+    "colors": [
+      "#2e7d32",
+      "#f9a825",
+      "#c62828"
+    ],
+    "seg1": "70",
+    "seg2": "100",
+    "diff": false,
+    "className": "",
+    "x": 1060,
+    "y": 160,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "w_chart",
+    "type": "ui_chart",
+    "name": "Potência",
+    "group": "g_grafico",
+    "order": 1,
+    "width": 12,
+    "height": 6,
+    "label": "Potência instantânea (W)",
+    "chartType": "line",
+    "legend": "false",
+    "xformat": "HH:mm:ss",
+    "interpolate": "linear",
+    "nodata": "Aguardando leituras do medidor...",
+    "dot": false,
+    "ymin": "0",
+    "ymax": "",
+    "removeOlder": "10",
+    "removeOlderPoints": "",
+    "removeOlderUnit": "60",
+    "cutout": 0,
+    "useOneColor": false,
+    "useUTC": false,
+    "colors": [
+      "#1f77b4",
+      "#aec7e8",
+      "#ff7f0e",
+      "#2ca02c",
+      "#98df8a",
+      "#d62728",
+      "#ff9896",
+      "#9467bd",
+      "#c5b0d5"
+    ],
+    "outputs": 1,
+    "useDifferentColor": false,
+    "className": "",
+    "x": 1050,
+    "y": 200,
+    "wires": [
+      []
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_custo",
+    "type": "ui_text",
+    "group": "g_agora",
+    "order": 2,
+    "width": 6,
+    "height": 2,
+    "name": "Custo estimado",
+    "label": "Custo estimado",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1060,
+    "y": 240,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_faixa",
+    "type": "ui_text",
+    "group": "g_agora",
+    "order": 3,
+    "width": 6,
+    "height": 1,
+    "name": "Faixa",
+    "label": "Faixa",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1040,
+    "y": 280,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_prev",
+    "type": "ui_text",
+    "group": "g_agora",
+    "order": 4,
+    "width": 6,
+    "height": 1,
+    "name": "Previsão do mês",
+    "label": "Previsão do mês",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1060,
+    "y": 320,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_kwh",
+    "type": "ui_text",
+    "group": "g_agora",
+    "order": 5,
+    "width": 6,
+    "height": 1,
+    "name": "Consumo",
+    "label": "Consumo",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1040,
+    "y": 360,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_msgs",
+    "type": "ui_text",
+    "group": "g_rede",
+    "order": 2,
+    "width": 6,
+    "height": 2,
+    "name": "Mensagens",
+    "label": "Mensagens",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1050,
+    "y": 400,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_entrega",
+    "type": "ui_text",
+    "group": "g_rede",
+    "order": 3,
+    "width": 6,
+    "height": 1,
+    "name": "Entrega",
+    "label": "Entrega",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1040,
+    "y": 440,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_buffer",
+    "type": "ui_text",
+    "group": "g_rede",
+    "order": 4,
+    "width": 6,
+    "height": 2,
+    "name": "Offline",
+    "label": "Offline",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 1040,
+    "y": 480,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_api",
+    "type": "function",
+    "name": "Montar leitura_energia",
+    "func": "\n// Ponte HTTP: converte a leitura para o formato da entidade leitura_energia da API Java.\n// O nó HTTP está desativado até a API publicar o endpoint POST /api/leituras.\nconst p = msg.payload;\nmsg.headers = { 'Content-Type': 'application/json' };\nmsg.payload = {\n    dispositivoCodigo: p.codigo,\n    dtLeitura: p.dt_leitura,\n    potenciaW: Number(p.potencia_w),\n    kwh: Number(p.kwh),\n    custoEstimado: Number(p.custo_estimado)\n};\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 750,
+    "y": 540,
+    "wires": [
+      [
+        "http_api"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "http_api",
+    "type": "http request",
+    "name": "POST ${API_URL}/api/leituras",
+    "method": "POST",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "${API_URL}/api/leituras",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "d": true,
+    "x": 1040,
+    "y": 540,
+    "wires": [
+      [
+        "dbg_api"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "dbg_api",
+    "type": "debug",
+    "name": "Resposta da API",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "true",
+    "targetType": "full",
+    "statusVal": "",
+    "statusType": "counter",
+    "x": 1290,
+    "y": 540,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_csv",
+    "type": "function",
+    "name": "Linha CSV",
+    "func": "\n// Uma linha por leitura em /data/leituras.csv (base das métricas do README)\nconst p = msg.payload;\nconst linhas = [];\nif (!context.get('cabecalho')) {\n    linhas.push('recebido_em;codigo;seq;dt_leitura;irms_a;potencia_w;kwh;custo_estimado;' +\n                'percentual_meta;faixa;projecao_mes;buffer_pendente;reenvio;atraso_s');\n    context.set('cabecalho', true);\n}\nlinhas.push([new Date().toISOString(), p.codigo, p.seq, p.dt_leitura || '', p.irms_a, p.potencia_w,\n             p.kwh, p.custo_estimado, p.percentual_meta, p.faixa, p.projecao_mes,\n             p.buffer_pendente, p.reenvio, msg.atraso_s === null ? '' : msg.atraso_s.toFixed(1)].join(';'));\nreturn { payload: linhas.join('\\n') };\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 730,
+    "y": 600,
+    "wires": [
+      [
+        "file_csv"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "file_csv",
+    "type": "file",
+    "name": "/data/leituras.csv",
+    "filename": "/data/leituras.csv",
+    "filenameType": "str",
+    "appendNewline": true,
+    "createDir": true,
+    "overwriteFile": "false",
+    "encoding": "utf8",
+    "x": 1030,
+    "y": 600,
+    "wires": [
+      []
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "c2",
+    "type": "comment",
+    "name": "2) Eventos: mudança de faixa, status (Last Will) e fechamento do mês",
+    "info": "",
+    "x": 270,
+    "y": 680,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "in_alerta",
+    "type": "mqtt in",
+    "name": "granaamiga/casa/+/alerta",
+    "topic": "granaamiga/casa/+/alerta",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 740,
+    "wires": [
+      [
+        "fn_alerta"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_alerta",
+    "type": "function",
+    "name": "Mensagem de alerta",
+    "func": "\n// Mudança de faixa -> aviso em linguagem simples (o mesmo texto iria para o WhatsApp/app)\nconst p = msg.payload;\nconst brl = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',');\nconst dicas = {\n    VERDE: 'Seu consumo voltou ao normal. Continue assim!',\n    AMARELO: 'Atenção: já usou ' + Math.round(p.percentual_meta) + '% da meta. Que tal encurtar o banho e tirar aparelhos da tomada?',\n    VERMELHO: 'A conta de luz passou da meta! Veja no app onde dá para economizar.'\n};\nmsg.payload = `Energia ${p.faixa_anterior} → ${p.faixa}: ${brl(p.custo_estimado)} de ${brl(p.meta_mensal_reais)}. ${dicas[p.faixa] || ''}`;\nmsg.topic = 'Grana Amiga';\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 450,
+    "y": 740,
+    "wires": [
+      [
+        "toast_alerta",
+        "t_alerta",
+        "dbg_alerta"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "toast_alerta",
+    "type": "ui_toast",
+    "position": "top right",
+    "displayTime": "8",
+    "highlight": "",
+    "sendall": true,
+    "outputs": 0,
+    "ok": "OK",
+    "cancel": "",
+    "raw": false,
+    "className": "",
+    "topic": "",
+    "name": "Aviso no dashboard",
+    "x": 720,
+    "y": 720,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_alerta",
+    "type": "ui_text",
+    "group": "g_rede",
+    "order": 5,
+    "width": 6,
+    "height": 3,
+    "name": "Último alerta",
+    "label": "Último alerta",
+    "format": "{{msg.payload}}",
+    "layout": "col-center",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 710,
+    "y": 760,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "dbg_alerta",
+    "type": "debug",
+    "name": "Alerta",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 700,
+    "y": 800,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "in_status",
+    "type": "mqtt in",
+    "name": "granaamiga/casa/+/status",
+    "topic": "granaamiga/casa/+/status",
+    "qos": "1",
+    "datatype": "utf8",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 170,
+    "y": 860,
+    "wires": [
+      [
+        "fn_status"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_status",
+    "type": "function",
+    "name": "Status do medidor",
+    "func": "\n// \"online\" ao conectar; \"offline\" publicado pelo broker (Last Will) se o medidor cair\nconst codigo = msg.topic.split('/')[2];\nconst online = msg.payload === 'online';\nnode.status({ fill: online ? 'green' : 'red', shape: 'dot', text: codigo + ' ' + msg.payload });\nconst texto = { payload: `<b style=\"color:${online ? '#2e7d32' : '#c62828'}\">${codigo} ${online ? 'ONLINE' : 'OFFLINE'}</b>` };\nconst aviso = online ? null : { topic: 'Grana Amiga', payload: `Medidor ${codigo} sem conexão. As leituras ficam guardadas nele e chegam quando a internet voltar.` };\nreturn [texto, aviso];\n",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 440,
+    "y": 860,
+    "wires": [
+      [
+        "t_status"
+      ],
+      [
+        "toast_status"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "t_status",
+    "type": "ui_text",
+    "group": "g_rede",
+    "order": 1,
+    "width": 6,
+    "height": 1,
+    "name": "Medidor",
+    "label": "Medidor",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "className": "",
+    "style": false,
+    "font": "",
+    "fontSize": 16,
+    "color": "#000000",
+    "x": 700,
+    "y": 840,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "toast_status",
+    "type": "ui_toast",
+    "position": "top right",
+    "displayTime": "8",
+    "highlight": "",
+    "sendall": true,
+    "outputs": 0,
+    "ok": "OK",
+    "cancel": "",
+    "raw": false,
+    "className": "",
+    "topic": "",
+    "name": "Aviso de queda",
+    "x": 710,
+    "y": 880,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "in_fech",
+    "type": "mqtt in",
+    "name": "granaamiga/casa/+/fechamento",
+    "topic": "granaamiga/casa/+/fechamento",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 180,
+    "y": 940,
+    "wires": [
+      [
+        "fn_fech"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_fech",
+    "type": "function",
+    "name": "Resumo do mês",
+    "func": "\nconst p = msg.payload;\nconst brl = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',');\nmsg.topic = 'Fechamento do mês';\nmsg.payload = `${Number(p.kwh).toFixed(1).replace('.', ',')} kWh · ${brl(p.custo_estimado)} · ` +\n              (p.dentro_da_meta ? 'dentro da meta 🎉' : 'acima da meta de ' + brl(p.meta_mensal_reais));\nreturn msg;\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 450,
+    "y": 940,
+    "wires": [
+      [
+        "toast_fech",
+        "dbg_fech"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "toast_fech",
+    "type": "ui_toast",
+    "position": "top right",
+    "displayTime": "8",
+    "highlight": "",
+    "sendall": true,
+    "outputs": 0,
+    "ok": "OK",
+    "cancel": "",
+    "raw": false,
+    "className": "",
+    "topic": "",
+    "name": "Aviso de fechamento",
+    "x": 720,
+    "y": 920,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "dbg_fech",
+    "type": "debug",
+    "name": "Fechamento",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 700,
+    "y": 960,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "c3",
+    "type": "comment",
+    "name": "3) Comandos para o medidor (comunicação nos dois sentidos)",
+    "info": "",
+    "x": 240,
+    "y": 1040,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "w_form",
+    "type": "ui_form",
+    "name": "Ajustes",
+    "label": "",
+    "group": "g_config",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "options": [
+      {
+        "label": "Meta mensal (R$)",
+        "value": "meta_mensal_reais",
+        "type": "number",
+        "required": false,
+        "rows": null
+      },
+      {
+        "label": "Tarifa (R$/kWh)",
+        "value": "tarifa_kwh",
+        "type": "number",
+        "required": false,
+        "rows": null
+      },
+      {
+        "label": "Tensão (127 ou 220 V)",
+        "value": "tensao_v",
+        "type": "number",
+        "required": false,
+        "rows": null
+      }
+    ],
+    "formValue": {
+      "meta_mensal_reais": "",
+      "tarifa_kwh": "",
+      "tensao_v": ""
+    },
+    "payload": "",
+    "submit": "Enviar ao medidor",
+    "cancel": "Limpar",
+    "topic": "",
+    "topicType": "str",
+    "splitLayout": "",
+    "className": "",
+    "x": 150,
+    "y": 1100,
+    "wires": [
+      [
+        "fn_cmd"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "w_zerar",
+    "type": "ui_button",
+    "name": "Zerar ciclo",
+    "group": "g_config",
+    "order": 2,
+    "width": 0,
+    "height": 0,
+    "passthru": false,
+    "label": "Começar novo mês (zerar)",
+    "tooltip": "",
+    "color": "",
+    "bgcolor": "",
+    "className": "",
+    "icon": "",
+    "payload": "{\"comando\":\"zerar_mes\"}",
+    "payloadType": "json",
+    "topic": "",
+    "topicType": "str",
+    "x": 160,
+    "y": 1160,
+    "wires": [
+      [
+        "fn_cmd"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_cmd",
+    "type": "function",
+    "name": "Montar comando",
+    "func": "\n// Remove campos vazios e envia para granaamiga/casa/<DISPOSITIVO>/config\nconst cmd = {};\nfor (const [k, v] of Object.entries(msg.payload || {})) {\n    if (v !== '' && v !== null && v !== undefined) cmd[k] = (k === 'comando') ? v : Number(v);\n}\nif (!Object.keys(cmd).length) return null;\nconst codigo = env.get('DISPOSITIVO') || 'GA-ESP32-001';\nreturn { topic: `granaamiga/casa/${codigo}/config`, payload: cmd, qos: 1 };\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 420,
+    "y": 1120,
+    "wires": [
+      [
+        "out_cmd",
+        "dbg_cmd"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "out_cmd",
+    "type": "mqtt out",
+    "name": "…/config",
+    "topic": "",
+    "qos": "1",
+    "retain": "false",
+    "respTopic": "",
+    "contentType": "",
+    "userProps": "",
+    "correl": "",
+    "expiry": "",
+    "broker": "broker",
+    "x": 640,
+    "y": 1100,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "dbg_cmd",
+    "type": "debug",
+    "name": "Comando enviado",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 660,
+    "y": 1140,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "in_ack",
+    "type": "mqtt in",
+    "name": "granaamiga/casa/+/config/ack",
+    "topic": "granaamiga/casa/+/config/ack",
+    "qos": "1",
+    "datatype": "json",
+    "broker": "broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0,
+    "x": 190,
+    "y": 1220,
+    "wires": [
+      [
+        "fn_ack"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "fn_ack",
+    "type": "function",
+    "name": "Confirmação do medidor",
+    "func": "\nconst p = msg.payload;\nconst brl = v => 'R$ ' + Number(v).toFixed(2).replace('.', ',');\nconst rej = (p.rejeitados || []).length ? ' · rejeitado: ' + p.rejeitados.join(', ') : '';\nreturn { topic: 'Medidor confirmou', payload: `meta ${brl(p.meta_mensal_reais)} · tarifa R$ ${p.tarifa_kwh}/kWh · ${p.tensao_v} V${rej}` };\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "",
+    "x": 460,
+    "y": 1220,
+    "wires": [
+      [
+        "toast_ack",
+        "dbg_ack"
+      ]
+    ],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "toast_ack",
+    "type": "ui_toast",
+    "position": "top right",
+    "displayTime": "8",
+    "highlight": "",
+    "sendall": true,
+    "outputs": 0,
+    "ok": "OK",
+    "cancel": "",
+    "raw": false,
+    "className": "",
+    "topic": "",
+    "name": "Aviso de confirmação",
+    "x": 720,
+    "y": 1200,
+    "wires": [],
+    "z": "flow_medidor"
+  },
+  {
+    "id": "dbg_ack",
+    "type": "debug",
+    "name": "Ack",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": true,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 690,
+    "y": 1240,
+    "wires": [],
+    "z": "flow_medidor"
+  }
+]

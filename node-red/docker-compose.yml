@@ -1,0 +1,19 @@
+# Sobe o Node-RED (editor em :1880, dashboard em :1880/ui)
+# Uso: docker compose up -d --build
+name: granaamiga-iot
+
+services:
+  node-red:
+    build: .
+    container_name: granaamiga-node-red
+    ports:
+      - "1880:1880"
+    env_file:
+      - path: .env          # opcional: copie .env.example para .env
+        required: false
+    volumes:
+      - node-red-data:/data # guarda o CSV de leituras entre reinícios
+    restart: unless-stopped
+
+volumes:
+  node-red-data:

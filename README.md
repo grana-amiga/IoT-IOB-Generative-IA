@@ -221,7 +221,9 @@ docker run --rm eclipse-mosquitto:2.0.20 mosquitto_pub -h broker.hivemq.com -t g
 | **JSON** | Texto livre, binário | Legível por qualquer sistema (Node-RED, Java, Flutter) e com os mesmos nomes do banco |
 | **Node-RED** | Código próprio em Java | Visto em aula, visual e rápido para validar, gerar dashboard e fazer ponte MQTT → HTTP; roda em container na mesma VM da API |
 | **Buffer + `seq`** | Confiar só no QoS | A PubSubClient só publica com QoS 0; o `seq` mostra perdas e o buffer recupera quedas |
-| **Wokwi** | Tinkercad | O Tinkercad não tem ESP32 nem Wi-Fi; o Wokwi simula a rede de verdade (as mensagens chegaram ao broker público) |
+| **Wokwi** | Tinkercad (usado nas aulas) | O Tinkercad não tem ESP32 nem Wi-Fi e a simulação não acessa a internet, então a parte de rede teria de ser fingida. O Wokwi simula o ESP32 com Wi-Fi de verdade: as mensagens chegaram ao broker público e ao Node-RED |
+
+> **Por que não usamos o Tinkercad, a ferramenta das aulas?** A solução depende de comunicação em rede (Wi-Fi + MQTT), e o Tinkercad não oferece placa com Wi-Fi nem acesso à internet a partir da simulação. Antes de seguir, o grupo consultou o professor da disciplina, que aprovou o uso do **Wokwi com ESP32** (conteúdo previsto para o próximo semestre) e indicou a **PubSubClient** para o MQTT e o **Node-RED** para o dashboard, exatamente as ferramentas adotadas. O firmware continua sendo Arduino (C++), com a mesma estrutura `setup()`/`loop()` e as mesmas funções vistas em aula (`analogRead()`, `digitalWrite()`).
 
 ---
 

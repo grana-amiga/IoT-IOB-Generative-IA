@@ -1,0 +1,113 @@
+# Saída do Serial Monitor do Wokwi — reteste de 12/11/2026 (~19h21–19h22), firmware com as correções do NTP e da 1ª leitura
+# Destaques:
+#  - CT-13: boot limpo, Wi-Fi + MQTT conectados sem o "assert failed" do lwIP (NTP agora só inicia depois do Wi-Fi)
+#  - Leitura seq 1 já sai com valores reais e data/hora do NTP (antes saía zerada: era registrada antes da 1ª medição)
+#  - CT-14: chave offline LIGADA -> leituras #6 a #10 no buffer (5/60) -> chave DESLIGADA -> reconexão
+#    e reenvio de seq 6..10 em ordem, "reenvio":true, buffer_pendente 4 -> 0; seq 11 volta ao fluxo normal
+#  - Nesta execução o client ID ainda tinha sufixo aleatório (-1e34 / -5876); fixado depois (ver mqtt-log-reconexao.txt)
+#  - Potenciômetro em ~27%: I=2.71 A -> P=344 W (2.71 x 127)
+
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1156
+load:0x40078000,len:11456
+ho 0 tail 12 room 4
+load:0x40080400,len:2972
+entry 0x400805dc
+
+==============================================
+ Grana Amiga - Medidor de energia IoT
+ Dispositivo: GA-ESP32-001
+ Modo: SIMULACAO (Wokwi, 1 s = 1 h)
+ Tensao: 127 V | Tarifa: R$ 0.8189/kWh | Meta: R$ 120.00
+ Broker: broker.hivemq.com:1883 | Topico: granaamiga/casa/GA-ESP32-001/#
+==============================================
+[MEDICAO] I=2.71 A | P=344 W | 0.344 kWh | R$ 0.28 | 0.2% da meta | VERDE | dia 1 | proj. R$ 0.28
+[WIFI] Conectado a "Wokwi-GUEST" | IP 10.10.0.2 | RSSI -74 dBm
+[MQTT] Conectando a broker.hivemq.com:1883 ...
+[MQTT] Conectado como granaamiga-GA-ESP32-001-1e34 | assinando granaamiga/casa/GA-ESP32-001/config
+[MEDICAO] I=2.71 A | P=344 W | 1.555 kWh | R$ 1.27 | 1.1% da meta | VERDE | dia 1 | proj. R$ 1.27
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":1,"dt_leitura":"2026-11-12T19:21:18-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":1.555,"custo_estimado":1.27,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":1.1,"faixa":"VERDE","projecao_mes":1.27,"alerta_projecao":false,"dia_ciclo":1,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=2.71 A | P=344 W | 1.899 kWh | R$ 1.55 | 1.3% da meta | VERDE | dia 1 | proj. R$ 1.55
+[MEDICAO] I=2.71 A | P=344 W | 2.243 kWh | R$ 1.84 | 1.5% da meta | VERDE | dia 1 | proj. R$ 1.84
+[MEDICAO] I=2.71 A | P=344 W | 2.587 kWh | R$ 2.12 | 1.8% da meta | VERDE | dia 1 | proj. R$ 2.12
+[MEDICAO] I=2.71 A | P=344 W | 2.931 kWh | R$ 2.40 | 2.0% da meta | VERDE | dia 1 | proj. R$ 2.40
+[MEDICAO] I=2.71 A | P=344 W | 3.275 kWh | R$ 2.68 | 2.2% da meta | VERDE | dia 1 | proj. R$ 2.68
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":2,"dt_leitura":"2026-11-12T19:21:23-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":3.275,"custo_estimado":2.68,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":2.2,"faixa":"VERDE","projecao_mes":2.68,"alerta_projecao":false,"dia_ciclo":1,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=2.71 A | P=344 W | 3.619 kWh | R$ 2.96 | 2.5% da meta | VERDE | dia 1 | proj. R$ 2.96
+[MEDICAO] I=2.71 A | P=344 W | 3.963 kWh | R$ 3.24 | 2.7% da meta | VERDE | dia 1 | proj. R$ 3.24
+[MEDICAO] I=2.71 A | P=344 W | 4.306 kWh | R$ 3.53 | 2.9% da meta | VERDE | dia 1 | proj. R$ 3.53
+[MEDICAO] I=2.71 A | P=344 W | 4.650 kWh | R$ 3.81 | 3.2% da meta | VERDE | dia 1 | proj. R$ 3.81
+[MEDICAO] I=2.71 A | P=344 W | 4.994 kWh | R$ 4.09 | 3.4% da meta | VERDE | dia 1 | proj. R$ 4.09
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":3,"dt_leitura":"2026-11-12T19:21:28-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":4.994,"custo_estimado":4.09,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":3.4,"faixa":"VERDE","projecao_mes":4.09,"alerta_projecao":false,"dia_ciclo":1,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=2.71 A | P=344 W | 5.338 kWh | R$ 4.37 | 3.6% da meta | VERDE | dia 1 | proj. R$ 4.37
+[MEDICAO] I=2.71 A | P=344 W | 5.682 kWh | R$ 4.65 | 3.9% da meta | VERDE | dia 1 | proj. R$ 4.65
+[MEDICAO] I=2.71 A | P=344 W | 6.026 kWh | R$ 4.93 | 4.1% da meta | VERDE | dia 1 | proj. R$ 4.93
+[MEDICAO] I=2.71 A | P=344 W | 6.370 kWh | R$ 5.22 | 4.3% da meta | VERDE | dia 1 | proj. R$ 5.22
+[MEDICAO] I=2.71 A | P=344 W | 6.714 kWh | R$ 5.50 | 4.6% da meta | VERDE | dia 1 | proj. R$ 5.50
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":4,"dt_leitura":"2026-11-12T19:21:33-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":6.714,"custo_estimado":5.50,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":4.6,"faixa":"VERDE","projecao_mes":5.50,"alerta_projecao":false,"dia_ciclo":1,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=2.71 A | P=344 W | 7.058 kWh | R$ 5.78 | 4.8% da meta | VERDE | dia 1 | proj. R$ 5.78
+[MEDICAO] I=2.71 A | P=344 W | 7.402 kWh | R$ 6.06 | 5.1% da meta | VERDE | dia 1 | proj. R$ 6.06
+[MEDICAO] I=2.71 A | P=344 W | 7.746 kWh | R$ 6.34 | 5.3% da meta | VERDE | dia 1 | proj. R$ 6.34
+[MEDICAO] I=2.71 A | P=344 W | 8.090 kWh | R$ 6.62 | 5.5% da meta | VERDE | dia 1 | proj. R$ 6.62
+[MEDICAO] I=2.71 A | P=344 W | 8.434 kWh | R$ 6.91 | 5.8% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":5,"dt_leitura":"2026-11-12T19:21:38-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":8.434,"custo_estimado":6.91,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":5.8,"faixa":"VERDE","projecao_mes":202.78,"alerta_projecao":true,"dia_ciclo":2,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=2.71 A | P=344 W | 8.778 kWh | R$ 7.19 | 6.0% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 9.122 kWh | R$ 7.47 | 6.2% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[TESTE] Chave offline LIGADA: simulando queda da internet
+[MEDICAO] I=2.71 A | P=344 W | 9.466 kWh | R$ 7.75 | 6.5% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 9.809 kWh | R$ 8.03 | 6.7% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 10.153 kWh | R$ 8.31 | 6.9% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[OFFLINE] Leitura #6 guardada no buffer (1/60)
+[MEDICAO] I=2.71 A | P=344 W | 10.497 kWh | R$ 8.60 | 7.2% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 10.841 kWh | R$ 8.88 | 7.4% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 11.185 kWh | R$ 9.16 | 7.6% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 11.529 kWh | R$ 9.44 | 7.9% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 11.873 kWh | R$ 9.72 | 8.1% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[OFFLINE] Leitura #7 guardada no buffer (2/60)
+[MEDICAO] I=2.71 A | P=344 W | 12.217 kWh | R$ 10.00 | 8.3% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 12.561 kWh | R$ 10.29 | 8.6% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 12.905 kWh | R$ 10.57 | 8.8% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 13.249 kWh | R$ 10.85 | 9.0% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 13.593 kWh | R$ 11.13 | 9.3% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[OFFLINE] Leitura #8 guardada no buffer (3/60)
+[MEDICAO] I=2.71 A | P=344 W | 13.937 kWh | R$ 11.41 | 9.5% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 14.281 kWh | R$ 11.69 | 9.7% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 14.625 kWh | R$ 11.98 | 10.0% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 14.969 kWh | R$ 12.26 | 10.2% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 15.313 kWh | R$ 12.54 | 10.4% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[OFFLINE] Leitura #9 guardada no buffer (4/60)
+[MEDICAO] I=2.71 A | P=344 W | 15.656 kWh | R$ 12.82 | 10.7% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 16.000 kWh | R$ 13.10 | 10.9% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 16.344 kWh | R$ 13.38 | 11.2% da meta | VERDE | dia 2 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 16.688 kWh | R$ 13.67 | 11.4% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 17.032 kWh | R$ 13.95 | 11.6% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[OFFLINE] Leitura #10 guardada no buffer (5/60)
+[TESTE] Chave offline DESLIGADA: reconectando
+[MQTT] Conectando a broker.hivemq.com:1883 ...
+[MQTT] Conectado como granaamiga-GA-ESP32-001-5876 | assinando granaamiga/casa/GA-ESP32-001/config
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":6,"dt_leitura":"2026-11-12T19:21:43-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":10.153,"custo_estimado":8.31,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":6.9,"faixa":"VERDE","projecao_mes":202.78,"alerta_projecao":true,"dia_ciclo":2,"buffer_pendente":4,"descartadas":0,"reenvio":true,"origem":"IOT"}
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":7,"dt_leitura":"2026-11-12T19:21:48-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":11.873,"custo_estimado":9.72,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":8.1,"faixa":"VERDE","projecao_mes":202.78,"alerta_projecao":true,"dia_ciclo":2,"buffer_pendente":3,"descartadas":0,"reenvio":true,"origem":"IOT"}
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":8,"dt_leitura":"2026-11-12T19:21:53-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":13.593,"custo_estimado":11.13,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":9.3,"faixa":"VERDE","projecao_mes":202.78,"alerta_projecao":true,"dia_ciclo":2,"buffer_pendente":2,"descartadas":0,"reenvio":true,"origem":"IOT"}
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":9,"dt_leitura":"2026-11-12T19:21:58-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":15.313,"custo_estimado":12.54,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":10.4,"faixa":"VERDE","projecao_mes":202.78,"alerta_projecao":true,"dia_ciclo":2,"buffer_pendente":1,"descartadas":0,"reenvio":true,"origem":"IOT"}
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":10,"dt_leitura":"2026-11-12T19:22:03-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":17.032,"custo_estimado":13.95,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":11.6,"faixa":"VERDE","projecao_mes":202.78,"alerta_projecao":true,"dia_ciclo":3,"buffer_pendente":0,"descartadas":0,"reenvio":true,"origem":"IOT"}
+[OFFLINE] Buffer descarregado: todas as leituras reenviadas
+[MEDICAO] I=2.71 A | P=344 W | 17.665 kWh | R$ 14.47 | 12.1% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 18.009 kWh | R$ 14.75 | 12.3% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 18.353 kWh | R$ 15.03 | 12.5% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 18.697 kWh | R$ 15.31 | 12.8% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":11,"dt_leitura":"2026-11-12T19:22:08-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":18.697,"custo_estimado":15.31,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":12.8,"faixa":"VERDE","projecao_mes":202.78,"alerta_projecao":true,"dia_ciclo":3,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=2.71 A | P=344 W | 19.041 kWh | R$ 15.59 | 13.0% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 19.385 kWh | R$ 15.87 | 13.2% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 19.729 kWh | R$ 16.16 | 13.5% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 20.073 kWh | R$ 16.44 | 13.7% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 20.417 kWh | R$ 16.72 | 13.9% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":12,"dt_leitura":"2026-11-12T19:22:13-03:00","irms_a":2.71,"tensao_v":127,"potencia_w":343.9,"kwh":20.417,"custo_estimado":16.72,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":13.9,"faixa":"VERDE","projecao_mes":202.78,"alerta_projecao":true,"dia_ciclo":3,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=2.71 A | P=344 W | 20.761 kWh | R$ 17.00 | 14.2% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 21.105 kWh | R$ 17.28 | 14.4% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 21.449 kWh | R$ 17.56 | 14.6% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)
+[MEDICAO] I=2.71 A | P=344 W | 21.793 kWh | R$ 17.84 | 14.9% da meta | VERDE | dia 3 | proj. R$ 202.78 (vai estourar)

@@ -242,8 +242,8 @@ Resumo (detalhes, critérios, métricas e limitações em **[`docs/testes.md`](d
 
 | Evidência | Arquivo |
 | --- | --- |
-| Serial do Wokwi | [`docs/evidencias/serial-wokwi.txt`](docs/evidencias/serial-wokwi.txt) |
-| Tráfego MQTT capturado por um assinante independente | [`docs/evidencias/mqtt-log.txt`](docs/evidencias/mqtt-log.txt) |
+| Serial do Wokwi | [`docs/evidencias/serial-wokwi.txt`](docs/evidencias/serial-wokwi.txt) e reteste do boot e da chave offline em [`serial-wokwi-reteste.txt`](docs/evidencias/serial-wokwi-reteste.txt) |
+| Tráfego MQTT capturado por um assinante independente | [`docs/evidencias/mqtt-log.txt`](docs/evidencias/mqtt-log.txt) e reconexão depois de reinício em [`mqtt-log-reconexao.txt`](docs/evidencias/mqtt-log-reconexao.txt) |
 | Leituras gravadas pelo Node-RED | [`docs/evidencias/leituras-node-red.csv`](docs/evidencias/leituras-node-red.csv) |
 | Capturas do circuito e do dashboard | [`docs/evidencias/`](docs/evidencias/) |
 

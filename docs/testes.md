@@ -5,8 +5,8 @@ Os testes foram executados em **12/11/2026** em três ambientes:
 
 | Ambiente | O que foi testado | Onde estão as evidências |
 | --- | --- | --- |
-| **Wokwi** (ESP32 simulado + Wi-Fi virtual `Wokwi-GUEST`) | Firmware completo: leitura, cálculo, LCD, LED, buzzer, Wi-Fi, MQTT, buffer, comando remoto | `evidencias/serial-wokwi.txt`, `evidencias/01-*.jpg`, `evidencias/02-*.jpg` |
-| **Broker público HiveMQ** + assinante independente (`mosquitto_sub`) | O que realmente trafegou na rede, com horário de chegada | `evidencias/mqtt-log.txt` |
+| **Wokwi** (ESP32 simulado + Wi-Fi virtual `Wokwi-GUEST`) | Firmware completo: leitura, cálculo, LCD, LED, buzzer, Wi-Fi, MQTT, buffer, comando remoto | `evidencias/serial-wokwi.txt`, `evidencias/serial-wokwi-reteste.txt`, `evidencias/01-*.jpg`, `evidencias/02-*.jpg`, `evidencias/05-*.png` |
+| **Broker público HiveMQ** + assinante independente (`mosquitto_sub`) | O que realmente trafegou na rede, com horário de chegada | `evidencias/mqtt-log.txt`, `evidencias/mqtt-log-reconexao.txt` |
 | **Node-RED** em container Docker + `tools/simulador_medidor.py` | Validação, métricas de entrega, perda, reenvio, dashboard, CSV | `evidencias/leituras-node-red.csv`, `evidencias/03-*.jpg`, `evidencias/04-*.jpg` |
 
 > O simulador em Python usa **as mesmas fórmulas e o mesmo JSON** do firmware. Ele existe para testar a parte de rede e nuvem sem depender do Wokwi, que roda mais devagar que o tempo real (ver Limitações).
@@ -34,7 +34,7 @@ Os testes foram executados em **12/11/2026** em três ambientes:
 | CT-01 | Leitura do sensor e potência | Potenciômetro em ~49% no Wokwi | I ≈ 4,9 A; P = I × 127 V | `I=4.93 A \| P=626 W` (4,93 × 127 = 626,1) | ✅ |
 | CT-02 | Integração de energia e custo | Mesma carga por ~1,5 h simuladas | kWh × R$ 0,81885 | `0.971 kWh \| R$ 0.80` (0,971 × 0,81885 = 0,795) | ✅ |
 | CT-03 | Conexão Wi-Fi + MQTT e status | Iniciar a simulação | Conecta em `Wokwi-GUEST`, publica `online` (retido) em `…/status` | `[WIFI] Conectado … IP 10.10.0.2` e `status online` no assinante externo | ✅ |
-| CT-04 | Buffer offline na inicialização | Primeira leitura sai antes de o Wi-Fi conectar | Leitura guardada e reenviada ao conectar | `[OFFLINE] Leitura #1 guardada` → publicada com `"reenvio":true` → `Buffer descarregado` | ✅ |
+| CT-04 | Buffer offline na inicialização | Primeira leitura sai antes de o Wi-Fi conectar | Leitura guardada e reenviada ao conectar | `[OFFLINE] Leitura #1 guardada` → publicada com `"reenvio":true` → `Buffer descarregado` (nessa execução a leitura saiu zerada; ver CT-15) | ✅ |
 | CT-05 | Comando remoto (nuvem → ESP32) | `mosquitto_pub … /config -m '{"meta_mensal_reais": 1.5}'` | Meta aplicada e confirmada em `…/config/ack` | `[CONFIG] 1 ajuste(s) aplicado(s) \| meta R$ 1.50` + ack com `"rejeitados":[]` | ✅ |
 | CT-06 | Mudança de faixa e atuadores | Custo R$ 1,82 com meta R$ 1,50 | 121,3% → VERMELHO, LED vermelho, buzzer, alerta MQTT | `[ALERTA] Faixa mudou: VERDE -> VERMELHO (121.3% da meta)`, LED vermelho e buzzer (`02-wokwi-vermelho-alarme.jpg`) | ✅ |
 | CT-07 | Last Will (medidor some) | Simulação parou de responder ao broker | Broker publica `offline` sozinho | `status offline` recebido 22 s depois da última mensagem (keep-alive de 15 s na época) | ✅ |
@@ -43,8 +43,10 @@ Os testes foram executados em **12/11/2026** em três ambientes:
 | CT-10 | Reenvio após queda | Simulador retém as leituras 40 a 55 (`--offline 40-55`) | 16 reenviadas na ordem, sem duplicar | CSV: **16 linhas com `reenvio=true`**, 0 duplicadas | ✅ |
 | CT-11 | Fechamento do mês | 144 leituras × 5 h = 720 h a 230 W | 165,6 kWh e R$ 135,60 (acima da meta) | `fechamento {"kwh": 165.6, "custo_estimado": 135.6, …}` e o mesmo valor no dashboard | ✅ |
 | CT-12 | Aviso antecipado (projeção) | Dia 3, 12% da meta, ritmo de 230 W | Ainda VERDE, mas prevê estouro | Dashboard: `VERDE` com `Previsão R$ 135,60 ⚠ vai passar da meta` (`03-dashboard-previsao.jpg`) | ✅ |
-| CT-13 | Boot do ESP32 | Reiniciar a simulação várias vezes | Nenhum travamento | **1º boot travou** (`assert failed` no lwIP ao conectar no MQTT). Causa: SNTP iniciado antes do Wi-Fi. Corrigido: `configTime()` só depois do Wi-Fi conectar | ⚠️ corrigido — repetir |
-| CT-14 | Chave "sem internet" | Mover a chave deslizante com o medidor conectado | `[TESTE] Chave offline LIGADA`, ícone X no LCD, leituras no buffer; ao voltar, reenvio | Não concluído: com a aba do navegador em segundo plano a simulação caiu para ~3% da velocidade | ⏳ executar com o Wokwi em primeiro plano |
+| CT-13 | Boot do ESP32 | Reiniciar a simulação várias vezes | Nenhum travamento | 1ª rodada: **1º boot travou** (`assert failed` no lwIP ao conectar no MQTT). Causa: SNTP iniciado antes do Wi-Fi. Corrigido: `configTime()` só depois do Wi-Fi conectar. Reteste (4 boots): todos limpos, `[WIFI] Conectado` → `[MQTT] Conectado` (`serial-wokwi-reteste.txt`) | ✅ |
+| CT-14 | Chave "sem internet" | Mover a chave deslizante com o medidor conectado | `[TESTE] Chave offline LIGADA`, ícone X no LCD, leituras no buffer; ao voltar, reenvio | Leituras #6 a #10 no buffer (5/60), ícone X no LCD (`05-wokwi-offline-buffer.png`), broker publicou `offline` na hora. Ao desligar a chave: reconexão e reenvio de `seq` 6 a 10 **na ordem**, `"reenvio":true`, `buffer_pendente` 4 → 0; `seq` 11 volta ao fluxo normal | ✅ |
+| CT-15 | Primeira leitura após o boot | Observar a `seq` 1 no reteste | Valores reais de corrente, kWh e custo | **Bug encontrado:** a `seq` 1 saía com tudo zerado, porque era registrada no 1º `loop()`, antes da 1ª medição (`ultimaPublicacao` começava em 0). Corrigido: os relógios de leitura e publicação começam juntos no `setup()`. Depois: `seq` 1 com `2.71 A`, `1.555 kWh`, `R$ 1.27` | ✅ corrigido e verificado |
+| CT-16 | Status depois de um reinício rápido (luz pisca) | Parar a simulação e religar em poucos segundos; assinante externo por 100 s | Status retido termina `online` | **Bug encontrado:** com client ID aleatório, o Last Will da sessão morta chegava ~90 s **depois** do `online` novo e o status ficava `offline` com o medidor funcionando. Corrigido: client ID fixo `granaamiga-GA-ESP32-001`; o broker derruba a sessão antiga na hora. Depois: `offline` 22:26:59 → `online` 22:27:00, nenhum `offline` atrasado, status retido `online` (`mqtt-log-reconexao.txt`) | ✅ corrigido e verificado |
 
 ### Como reproduzir os testes
 
@@ -101,6 +103,7 @@ O SCT-013 é um **alicate não invasivo**: abraça um dos fios do quadro sem cor
 | Situação | O que acontece |
 | --- | --- |
 | A internet da casa cai | O medidor continua medindo, mostrando no LCD e acionando LED/buzzer. As leituras vão para o buffer e são reenviadas com `reenvio: true` quando a conexão volta. O broker publica `offline` (Last Will) e o dashboard avisa. |
+| A luz pisca e o medidor reinicia | Reconecta sozinho com o mesmo client ID; o broker encerra a sessão antiga e o status volta a `online` em segundos (CT-16). As leituras não enviadas que estavam na RAM se perdem (ver Limitações: buffer em RAM). |
 | O broker sai do ar | Mesmo comportamento: tentativas de reconexão a cada 5 s sem travar o medidor (`setSocketTimeout(3)`). |
 | Duas casas com medidor | Cada uma tem seu `CODIGO_DISPOSITIVO`; os tópicos ficam `granaamiga/casa/<codigo>/…` e o Node-RED assina `granaamiga/casa/+/…`. |
 | A casa é 220 V | Comando `{"tensao_v": 220}` em `…/config`, sem regravar o firmware. |

@@ -5,7 +5,7 @@ Disciplina: **Disruptive Architectures: IoT, IoB & Generative IA**
 
 > Um medidor de baixo custo (ESP32 + sensor de corrente) que mostra **em reais** quanto a casa está gastando de luz e **avisa antes de a conta estourar** a meta da família. Ele faz parte do **Grana Amiga**, app de educação e organização financeira para famílias endividadas.
 
-🔗 **Simulação no Wokwi:** `COLOCAR_LINK_DO_PROJETO_WOKWI`
+🔗 **Simulação no Wokwi:** https://wokwi.com/projects/480528483029211137
 🎥 **Demonstração em vídeo (opcional):** `COLOCAR_LINK_AQUI`
 
 ---
@@ -152,7 +152,7 @@ custo ÷ horas decorridas × 720 h                      = previsão do fim do m�
 
 ### 4.1 Simulação no Wokwi (recomendado para avaliação)
 
-**Opção A:** abrir o link do projeto no topo deste README e clicar em ▶.
+**Opção A:** abrir <https://wokwi.com/projects/480528483029211137> e clicar em ▶ (não precisa de conta para rodar).
 
 **Opção B:** montar do zero:
 1. Acesse <https://wokwi.com/projects/new/esp32>.

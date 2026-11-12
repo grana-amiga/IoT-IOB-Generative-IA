@@ -255,7 +255,8 @@ void setup() {
   mqtt.setKeepAlive(60);     // sem sinal por ~90 s, o broker publica o Last Will "offline"
   mqtt.setSocketTimeout(3);  // não trava o medidor se o broker estiver fora
 
-  ultimaLeitura = millis();
+  // Os dois relógios começam juntos: a 1ª leitura só é registrada depois da 1ª medição
+  ultimaLeitura = ultimaPublicacao = millis();
 }
 
 // =====================================================================
@@ -541,7 +542,10 @@ void gerenciarRede(unsigned long agora) {
 }
 
 void conectarMqtt() {
-  String clientId = String("granaamiga-") + CODIGO_DISPOSITIVO + "-" + String((uint32_t)random(0xFFFF), HEX);
+  // Client ID fixo (sem sufixo aleatório): ao reconectar depois de um reboot, o broker
+  // derruba na hora a sessão antiga com o mesmo ID. Com ID aleatório, o Last Will da
+  // sessão morta chegava ~90 s depois do "online" novo e deixava o status "offline" retido.
+  String clientId = String("granaamiga-") + CODIGO_DISPOSITIVO;
   const char* usuario = strlen(MQTT_USUARIO) > 0 ? MQTT_USUARIO : nullptr;
   const char* senha   = strlen(MQTT_SENHA)   > 0 ? MQTT_SENHA   : nullptr;
 

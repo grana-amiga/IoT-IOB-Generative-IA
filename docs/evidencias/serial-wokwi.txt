@@ -1,0 +1,99 @@
+# Saída do Serial Monitor do Wokwi — execução de 12/11/2026 (~16h12–16h30), firmware antes da correção do NTP
+# Destaques:
+#  - 1º boot: travou na conexão MQTT (assert do lwIP) -> motivou a correção "NTP só depois do Wi-Fi" (ver testes.md, CT-11)
+#  - Leitura #1 guardada sem rede e reenviada com "reenvio":true ao conectar (buffer offline)
+#  - Potenciômetro em ~49%: I=4.93 A -> P=626 W (4.93 x 127)
+#  - Comando remoto {"meta_mensal_reais":1.5} aplicado -> config/ack -> alerta VERDE -> VERMELHO
+#  - Simulação rodando a 3-10% da velocidade real (aba em segundo plano): reconexões MQTT e leitura #5 no buffer
+
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1156
+load:0x40078000,len:11456
+ho 0 tail 12 room 4
+load:0x40080400,len:2972
+entry 0x400805dc
+
+==============================================
+ Grana Amiga - Medidor de energia IoT
+ Dispositivo: GA-ESP32-001
+ Modo: SIMULACAO (Wokwi, 1 s = 1 h)
+ Tensao: 127 V | Tarifa: R$ 0.8189/kWh | Meta: R$ 120.00
+ Broker: broker.hivemq.com:1883 | Topico: granaamiga/casa/GA-ESP32-001/#
+==============================================
+[OFFLINE] Leitura #1 guardada no buffer (1/60)
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[WIFI] Conectado a "Wokwi-GUEST" | IP 10.10.0.2 | RSSI -68 dBm
+[MQTT] Conectando a broker.hivemq.com:1883 ...
+
+assert failed: 0x400fb076 <cached disabled>:1278 (<cached disabled>)
+
+
+Backtrace: 0x4008d62c:0x3ffb1be0 0x4008d5f1:0x3ffb1c00 0x40093c41:0x3ffb1c20 0x400fb076:0x3ffb1d60 0x400f37ac:0x3ffb1d80 0x400f380d:0x3ffb1dc0 0x400f23ad:0x3ffb1de0 0x400f2465:0x3ffb1e20 0x400f24dc:0x3ffb1e40 0x400f28d2:0x3ffb1e60 0x400f33c5:0x3ffb1e80 0x400d9d92:0x3ffb1ea0 0x400d7d84:0x3ffb1f20 0x40174521:0x3ffb1f80 0x400da205:0x3ffb1fa0 0x400da38d:0x3ffb2010 0x400d34b6:0x3ffb2040 0x400d6ad2:0x3ffb20c0 0x400d6b0c:0x3ffb2110 0x400e06b8:0x3ffb2130 0x4008e475:0x3ffb2150
+
+
+
+
+ELF file SHA256: 3760518f0
+
+Rebooting...
+ets Jul 29 2019 12:21:46
+
+rst:0xc (SW_CPU_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:2
+load:0x3fff0030,len:1156
+load:0x40078000,len:11456
+ho 0 tail 12 room 4
+load:0x40080400,len:2972
+entry 0x400805dc
+
+==============================================
+ Grana Amiga - Medidor de energia IoT
+ Dispositivo: GA-ESP32-001
+ Modo: SIMULACAO (Wokwi, 1 s = 1 h)
+ Tensao: 127 V | Tarifa: R$ 0.8189/kWh | Meta: R$ 120.00
+ Broker: broker.hivemq.com:1883 | Topico: granaamiga/casa/GA-ESP32-001/#
+==============================================
+[OFFLINE] Leitura #1 guardada no buffer (1/60)
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[WIFI] Conectado a "Wokwi-GUEST" | IP 10.10.0.2 | RSSI -82 dBm
+[MQTT] Conectando a broker.hivemq.com:1883 ...
+[MQTT] Conectado como granaamiga-GA-ESP32-001-26ed | assinando granaamiga/casa/GA-ESP32-001/config
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":1,"dt_leitura":null,"irms_a":0.00,"tensao_v":127,"potencia_w":0.0,"kwh":0.000,"custo_estimado":0.00,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":0.0,"faixa":"VERDE","projecao_mes":0.00,"alerta_projecao":false,"dia_ciclo":1,"buffer_pendente":0,"descartadas":0,"reenvio":true,"origem":"IOT"}
+[OFFLINE] Buffer descarregado: todas as leituras reenviadas
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":2,"dt_leitura":"2026-11-12T16:17:30-03:00","irms_a":0.00,"tensao_v":127,"potencia_w":0.0,"kwh":0.000,"custo_estimado":0.00,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":0.0,"faixa":"VERDE","projecao_mes":0.00,"alerta_projecao":false,"dia_ciclo":1,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[MEDICAO] I=0.00 A | P=0 W | 0.000 kWh | R$ 0.00 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.00
+[MEDICAO] I=0.24 A | P=31 W | 0.031 kWh | R$ 0.03 | 0.0% da meta | VERDE | dia 1 | proj. R$ 0.03
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":3,"dt_leitura":"2026-11-12T16:17:35-03:00","irms_a":0.24,"tensao_v":127,"potencia_w":31.0,"kwh":0.031,"custo_estimado":0.03,"tarifa_kwh":0.81885,"meta_mensal_reais":120.00,"percentual_meta":0.0,"faixa":"VERDE","projecao_mes":0.03,"alerta_projecao":false,"dia_ciclo":1,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MQTT] Conectando a broker.hivemq.com:1883 ...
+[MQTT] Conectado como granaamiga-GA-ESP32-001-e229 | assinando granaamiga/casa/GA-ESP32-001/config
+[MEDICAO] I=4.93 A | P=626 W | 0.971 kWh | R$ 0.80 | 0.7% da meta | VERDE | dia 1 | proj. R$ 0.80
+[MEDICAO] I=4.93 A | P=626 W | 1.597 kWh | R$ 1.31 | 1.1% da meta | VERDE | dia 1 | proj. R$ 1.31
+[CONFIG] 1 ajuste(s) aplicado(s) | meta R$ 1.50 | tarifa R$ 0.81885/kWh | 127 V
+[MQTT] -> granaamiga/casa/GA-ESP32-001/config/ack {"rejeitados":[],"codigo":"GA-ESP32-001","aplicados":1,"meta_mensal_reais":1.50,"tarifa_kwh":0.81885,"tensao_v":127}
+[ALERTA] Faixa mudou: VERDE -> VERMELHO (121.3% da meta)
+[MQTT] -> granaamiga/casa/GA-ESP32-001/alerta {"codigo":"GA-ESP32-001","faixa_anterior":"VERDE","faixa":"VERMELHO","percentual_meta":121.3,"custo_estimado":1.82,"meta_mensal_reais":1.50}
+[MEDICAO] I=4.93 A | P=626 W | 2.222 kWh | R$ 1.82 | 121.3% da meta | VERMELHO | dia 1 | proj. R$ 1.82
+[MEDICAO] I=4.93 A | P=626 W | 2.848 kWh | R$ 2.33 | 155.5% da meta | VERMELHO | dia 1 | proj. R$ 2.33
+[MEDICAO] I=4.93 A | P=626 W | 3.473 kWh | R$ 2.84 | 189.6% da meta | VERMELHO | dia 1 | proj. R$ 2.84
+[MQTT] -> granaamiga/casa/GA-ESP32-001/energia {"codigo":"GA-ESP32-001","seq":4,"dt_leitura":"2026-11-12T16:17:40-03:00","irms_a":4.93,"tensao_v":127,"potencia_w":625.5,"kwh":3.473,"custo_estimado":2.84,"tarifa_kwh":0.81885,"meta_mensal_reais":1.50,"percentual_meta":189.6,"faixa":"VERMELHO","projecao_mes":2.84,"alerta_projecao":false,"dia_ciclo":1,"buffer_pendente":0,"descartadas":0,"reenvio":false,"origem":"IOT"}
+[MEDICAO] I=4.93 A | P=626 W | 4.099 kWh | R$ 3.36 | 223.8% da meta | VERMELHO | dia 1 | proj. R$ 3.36
+[MEDICAO] I=4.93 A | P=626 W | 4.724 kWh | R$ 3.87 | 257.9% da meta | VERMELHO | dia 1 | proj. R$ 3.87
+[MEDICAO] I=4.93 A | P=626 W | 5.350 kWh | R$ 4.38 | 292.1% da meta | VERMELHO | dia 1 | proj. R$ 4.38
+[MQTT] Conectando a broker.hivemq.com:1883 ...
+[MQTT] Conectado como granaamiga-GA-ESP32-001-b3c4 | assinando granaamiga/casa/GA-ESP32-001/config
+[MEDICAO] I=4.93 A | P=626 W | 5.976 kWh | R$ 4.89 | 326.2% da meta | VERMELHO | dia 1 | proj. R$ 4.89
+[MEDICAO] I=4.93 A | P=626 W | 6.601 kWh | R$ 5.41 | 360.4% da meta | VERMELHO | dia 1 | proj. R$ 5.41
+[OFFLINE] Leitura #5 guardada no buffer (1/60)

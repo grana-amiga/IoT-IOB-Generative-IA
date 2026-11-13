@@ -4,7 +4,7 @@
     "type": "tab",
     "label": "Grana Amiga - Medidor de energia",
     "disabled": false,
-    "info": "Recebe as leituras do medidor ESP32 via MQTT, valida, calcula métricas de entrega, mostra no dashboard (/ui), grava CSV e faz a ponte HTTP para a API Java."
+    "info": "Recebe as leituras do medidor ESP32 via MQTT, valida, calcula métricas de entrega, mostra no dashboard (/ui), grava CSV e envia 1 leitura por minuto para a API Java (login JWT)."
   },
   {
     "id": "broker",
@@ -122,7 +122,7 @@
     "id": "fn_validar",
     "type": "function",
     "name": "Validar leitura + métricas",
-    "func": "\n// Valida o JSON do medidor e calcula as métricas de entrega (evidências de teste)\nconst p = msg.payload;\nif (typeof p !== 'object' || p === null) {\n    msg.erro = 'payload não é JSON';\n    return [null, msg];\n}\nconst obrigatorios = ['codigo', 'seq', 'potencia_w', 'kwh', 'custo_estimado',\n                      'meta_mensal_reais', 'percentual_meta', 'faixa'];\nconst faltando = obrigatorios.filter(c => p[c] === undefined || p[c] === null);\nif (faltando.length) {\n    msg.erro = 'campos ausentes: ' + faltando.join(', ');\n    return [null, msg];\n}\nif (p.potencia_w < 0 || p.kwh < 0 || !['VERDE', 'AMARELO', 'VERMELHO'].includes(p.faixa)) {\n    msg.erro = 'valores fora do esperado';\n    return [null, msg];\n}\n\n// ---- Métricas por medidor ----\nconst todas = flow.get('metricas') || {};\nlet m = todas[p.codigo];\n// seq = 1 sem ser reenvio = medidor reiniciou: recomeça a contagem\nif (!m || (p.seq === 1 && !p.reenvio)) {\n    m = { recebidas: 0, unicas: 0, duplicadas: 0, reenvios: 0, maiorSeq: 0,\n          vistos: {}, somaAtrasoAoVivo: 0, qtdAoVivo: 0, maiorAtrasoReenvio: 0 };\n}\nm.recebidas++;\nif (m.vistos[p.seq]) {\n    m.duplicadas++;\n} else {\n    m.vistos[p.seq] = true;\n    m.unicas++;\n}\nif (p.reenvio) m.reenvios++;\nif (p.seq > m.maiorSeq) m.maiorSeq = p.seq;\n\n// Atraso = hora de chegada - hora da leitura (o relógio do ESP32 vem do NTP)\nlet atraso = null;\nif (p.dt_leitura) {\n    atraso = Math.max(0, (Date.now() - Date.parse(p.dt_leitura)) / 1000);\n    if (p.reenvio) {\n        m.maiorAtrasoReenvio = Math.max(m.maiorAtrasoReenvio, atraso);\n    } else {\n        m.somaAtrasoAoVivo += atraso;\n        m.qtdAoVivo++;\n    }\n}\n\nconst perdidas = Math.max(0, m.maiorSeq - m.unicas);\ntodas[p.codigo] = m;\nflow.set('metricas', todas);\n\nmsg.metricas = {\n    recebidas: m.recebidas,\n    perdidas: perdidas,\n    duplicadas: m.duplicadas,\n    reenvios: m.reenvios,\n    taxaEntrega: m.maiorSeq ? (100 * m.unicas / m.maiorSeq).toFixed(1) : '100.0',\n    atrasoMedioAoVivo: m.qtdAoVivo ? (m.somaAtrasoAoVivo / m.qtdAoVivo).toFixed(1) : '-',\n    maiorAtrasoReenvio: m.maiorAtrasoReenvio.toFixed(0)\n};\nmsg.atraso_s = atraso;\nnode.status({ fill: 'green', shape: 'dot',\n              text: `#${p.seq} ${p.faixa} · entrega ${msg.metricas.taxaEntrega}%` });\nreturn [msg, null];\n",
+    "func": "\n// Valida o JSON do medidor e calcula as métricas de entrega (evidências de teste)\nconst p = msg.payload;\nif (typeof p !== 'object' || p === null) {\n    msg.erro = 'payload não é JSON';\n    return [null, msg];\n}\nconst obrigatorios = ['codigo', 'seq', 'potencia_w', 'kwh', 'custo_estimado',\n                      'meta_mensal_reais', 'percentual_meta', 'faixa'];\nconst faltando = obrigatorios.filter(c => p[c] === undefined || p[c] === null);\nif (faltando.length) {\n    msg.erro = 'campos ausentes: ' + faltando.join(', ');\n    return [null, msg];\n}\nif (p.potencia_w < 0 || p.kwh < 0 || !['VERDE', 'AMARELO', 'VERMELHO'].includes(p.faixa)) {\n    msg.erro = 'valores fora do esperado';\n    return [null, msg];\n}\n\n// ---- Métricas por medidor ----\nconst todas = flow.get('metricas') || {};\nlet m = todas[p.codigo];\n// seq = 1 sem ser reenvio = medidor reiniciou: recomeça a contagem\nif (!m || (p.seq === 1 && !p.reenvio)) {\n    m = { recebidas: 0, unicas: 0, duplicadas: 0, reenvios: 0, maiorSeq: 0,\n          vistos: {}, somaAtrasoAoVivo: 0, qtdAoVivo: 0, maiorAtrasoReenvio: 0 };\n}\nm.recebidas++;\nmsg.duplicada = !!m.vistos[p.seq];\nif (msg.duplicada) {\n    m.duplicadas++;\n} else {\n    m.vistos[p.seq] = true;\n    m.unicas++;\n}\nif (p.reenvio) m.reenvios++;\nif (p.seq > m.maiorSeq) m.maiorSeq = p.seq;\n\n// Atraso = hora de chegada - hora da leitura (o relógio do ESP32 vem do NTP)\nlet atraso = null;\nif (p.dt_leitura) {\n    atraso = Math.max(0, (Date.now() - Date.parse(p.dt_leitura)) / 1000);\n    if (p.reenvio) {\n        m.maiorAtrasoReenvio = Math.max(m.maiorAtrasoReenvio, atraso);\n    } else {\n        m.somaAtrasoAoVivo += atraso;\n        m.qtdAoVivo++;\n    }\n}\n\nconst perdidas = Math.max(0, m.maiorSeq - m.unicas);\ntodas[p.codigo] = m;\nflow.set('metricas', todas);\n\nmsg.metricas = {\n    recebidas: m.recebidas,\n    perdidas: perdidas,\n    duplicadas: m.duplicadas,\n    reenvios: m.reenvios,\n    taxaEntrega: m.maiorSeq ? (100 * m.unicas / m.maiorSeq).toFixed(1) : '100.0',\n    atrasoMedioAoVivo: m.qtdAoVivo ? (m.somaAtrasoAoVivo / m.qtdAoVivo).toFixed(1) : '-',\n    maiorAtrasoReenvio: m.maiorAtrasoReenvio.toFixed(0)\n};\nmsg.atraso_s = atraso;\nnode.status({ fill: 'green', shape: 'dot',\n              text: `#${p.seq} ${p.faixa} · entrega ${msg.metricas.taxaEntrega}%` });\nreturn [msg, null];\n",
     "outputs": 2,
     "timeout": 0,
     "noerr": 0,
@@ -446,32 +446,82 @@
   {
     "id": "fn_api",
     "type": "function",
-    "name": "Montar leitura_energia",
-    "func": "\n// Ponte HTTP: converte a leitura para o formato da entidade leitura_energia da API Java.\n// O nó HTTP está desativado até a API publicar o endpoint POST /api/leituras.\nconst p = msg.payload;\nmsg.headers = { 'Content-Type': 'application/json' };\nmsg.payload = {\n    dispositivoCodigo: p.codigo,\n    dtLeitura: p.dt_leitura,\n    potenciaW: Number(p.potencia_w),\n    kwh: Number(p.kwh),\n    custoEstimado: Number(p.custo_estimado)\n};\nreturn msg;\n",
+    "name": "Agregar para a API (1/min)",
+    "func": "\n// Ponte para a API Java: agrega as leituras de 5 s em 1 leitura por minuto.\n// O medidor manda o kWh ACUMULADO do mês, mas a API soma o kWh de cada leitura\n// no resumo mensal. Então enviamos só o que foi consumido na janela (delta).\nconst JANELA_MS = 60 * 1000;\nconst p = msg.payload;\nif (msg.duplicada) return null;              // mesma seq já contada\n\nconst kwh = Number(p.kwh);\nconst instante = p.dt_leitura ? Date.parse(p.dt_leitura) : Date.now();\nconst estados = flow.get('apiJanelas') || {};\nlet j = estados[p.codigo];\n\nif (!j) {\n    // 1ª leitura desde que o Node-RED subiu: vira a base (não reenvia o mês inteiro)\n    estados[p.codigo] = { kwhBase: kwh, inicio: instante, somaPot: 0, n: 0 };\n    flow.set('apiJanelas', estados);\n    node.status({ fill: 'grey', shape: 'ring', text: `base ${kwh.toFixed(3)} kWh` });\n    return null;\n}\nif (kwh < j.kwhBase) j.kwhBase = 0;          // medidor reiniciou ou zerou o ciclo\n\nj.somaPot += Number(p.potencia_w);\nj.n++;\nj.ultimoDt = p.dt_leitura || null;\nif (instante - j.inicio < JANELA_MS) { flow.set('apiJanelas', estados); return null; }\n\nconst delta = Number((kwh - j.kwhBase).toFixed(6));\nconst potMedia = j.somaPot / j.n;\nconst dt = j.ultimoDt;\nj.inicio = instante; j.somaPot = 0; j.n = 0;\nif (delta <= 0) {                            // sem consumo: fica para a próxima janela\n    flow.set('apiJanelas', estados);\n    node.status({ fill: 'grey', shape: 'ring', text: 'janela sem consumo' });\n    return null;\n}\nj.kwhBase = kwh;\nflow.set('apiJanelas', estados);\n\nconst leitura = {\n    potenciaW: Number(potMedia.toFixed(3)),\n    kwh: delta\n};\n// \"2026-11-13T10:00:00-03:00\" -> \"2026-11-13T10:00:00\" (a API usa LocalDateTime no fuso de SP)\nif (dt) leitura.dataLeitura = dt.substring(0, 19);\n\nnode.status({ fill: 'blue', shape: 'dot', text: `${delta} kWh · ${leitura.potenciaW} W` });\nreturn {\n    leitura: {\n        codigo: p.codigo,\n        corpo: leitura,\n        // usados só se o dispositivo ainda não existir na conta\n        dispositivo: { codigo: p.codigo, tarifaKwh: Number(p.tarifa_kwh),\n                       metaMensalReais: Number(p.meta_mensal_reais) }\n    }\n};\n",
     "outputs": 1,
     "timeout": 0,
     "noerr": 0,
     "initialize": "",
     "finalize": "",
     "libs": [],
-    "info": "",
-    "x": 750,
+    "info": "O medidor publica a cada 5 s o kWh ACUMULADO do mês; a API soma o kWh de cada leitura no resumo mensal. Por isso a ponte envia a diferença (delta) de kWh de uma janela de 60 s e a potência média da janela. Janela sem consumo não é enviada (a API exige kWh > 0) e o consumo passa para a próxima.",
+    "x": 760,
     "y": 540,
     "wires": [
       [
-        "http_api"
+        "fn_api_fila"
       ]
     ],
     "z": "flow_medidor"
   },
   {
+    "id": "c_api",
+    "type": "comment",
+    "z": "flow_medidor",
+    "name": "Ponte para a API Java: 1 leitura/min com o kWh da janela, login JWT, fila se a API cair",
+    "info": "",
+    "x": 1060,
+    "y": 460,
+    "wires": []
+  },
+  {
+    "id": "tick_api",
+    "type": "inject",
+    "z": "flow_medidor",
+    "name": "Tentar de novo (30 s)",
+    "props": [],
+    "repeat": "30",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "5",
+    "topic": "",
+    "x": 790,
+    "y": 500,
+    "wires": [
+      [
+        "fn_api_fila"
+      ]
+    ]
+  },
+  {
+    "id": "fn_api_fila",
+    "type": "function",
+    "z": "flow_medidor",
+    "name": "Fila da API (login + envio)",
+    "func": "\n// Uma requisição por vez. A fila guarda as leituras se a API estiver fora do ar\n// (mesma ideia do buffer offline do ESP32, agora entre o Node-RED e a API).\nconst MAX_FILA = 500;\nconst base = (env.get('API_URL') || '').replace(/\\/$/, '');\nconst fila = flow.get('apiFila') || [];\n\nif (msg.leitura) {\n    fila.push(msg.leitura);\n    if (fila.length > MAX_FILA) fila.shift();\n    flow.set('apiFila', fila);\n}\nconst ocupado = flow.get('apiOcupado') || 0;\nif (ocupado && Date.now() - ocupado < 30000) return null;   // já tem requisição em andamento\nif (!fila.length) {\n    node.status({ fill: 'green', shape: 'dot', text: 'fila vazia' });\n    return null;\n}\nif (!base) {\n    node.status({ fill: 'red', shape: 'ring', text: 'defina API_URL' });\n    return null;\n}\n\nconst json = { 'Content-Type': 'application/json', 'Accept': 'application/json' };\nconst req = (etapa, method, path, payload, token) => {\n    flow.set('apiOcupado', Date.now());\n    node.status({ fill: 'yellow', shape: 'dot', text: `${etapa} · ${fila.length} na fila` });\n    const headers = Object.assign({}, json);\n    if (token) headers.Authorization = 'Bearer ' + token;\n    return { etapa, method, url: base + path, headers, payload: payload || '' };\n};\n\n// 1) Token JWT (vale 2 h; renova 5 min antes)\nconst auth = flow.get('apiAuth');\nif (!auth || auth.expira - Date.now() < 5 * 60 * 1000) {\n    const telefone = env.get('API_TELEFONE'), senha = env.get('API_SENHA');\n    if (!telefone || !senha) {\n        node.status({ fill: 'red', shape: 'ring', text: 'defina API_TELEFONE e API_SENHA' });\n        return null;\n    }\n    return req('login', 'POST', '/api/v1/auth/login', { telefone, senha });\n}\n\n// 2) Id numérico do dispositivo (a API usa id na rota; o medidor conhece o código)\nconst item = fila[0];\nconst ids = flow.get('apiDispositivos') || {};\nif (!(item.codigo in ids)) return req('listar', 'GET', '/api/v1/dispositivos', null, auth.token);\nif (ids[item.codigo] === null) return req('criar', 'POST', '/api/v1/dispositivos', item.dispositivo, auth.token);\n\n// 3) A leitura em si\nreturn req('leitura', 'POST', `/api/v1/dispositivos/${ids[item.codigo]}/leituras`, item.corpo, auth.token);\n",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "Entradas: leituras agregadas, a resposta anterior (continuar) e o tique de 30 s (nova tentativa).\nSó faz uma requisição por vez.",
+    "x": 1010,
+    "y": 540,
+    "wires": [
+      [
+        "http_api"
+      ]
+    ]
+  },
+  {
     "id": "http_api",
     "type": "http request",
-    "name": "POST ${API_URL}/api/leituras",
-    "method": "POST",
+    "name": "API Java (msg.method + msg.url)",
+    "method": "use",
     "ret": "obj",
     "paytoqs": "ignore",
-    "url": "${API_URL}/api/leituras",
+    "url": "",
     "tls": "",
     "persist": false,
     "proxy": "",
@@ -479,15 +529,39 @@
     "authType": "",
     "senderr": false,
     "headers": [],
-    "d": true,
-    "x": 1040,
+    "d": false,
+    "x": 1260,
     "y": 540,
     "wires": [
       [
-        "dbg_api"
+        "fn_api_resposta"
       ]
     ],
     "z": "flow_medidor"
+  },
+  {
+    "id": "fn_api_resposta",
+    "type": "function",
+    "z": "flow_medidor",
+    "name": "Tratar resposta da API",
+    "func": "\n// Decide o que fazer com cada resposta e, se deu certo, pede a próxima requisição.\nflow.set('apiOcupado', 0);\nconst fila = flow.get('apiFila') || [];\nconst ids = flow.get('apiDispositivos') || {};\nconst s = msg.statusCode;\nconst p = msg.payload;\nconst continuar = { topic: 'continuar' };\nconst log = (texto) => ({ payload: `${msg.etapa} ${s}: ${texto}` });\n\n// Sem resposta (API desligada, rede): espera o próximo tique de 30 s\nif (typeof s !== 'number') {\n    node.status({ fill: 'red', shape: 'ring', text: `API fora do ar (${s}) · ${fila.length} na fila` });\n    return [null, log('sem conexão, tento de novo em 30 s')];\n}\nif (s === 401 && msg.etapa !== 'login') {          // token vencido ou API reiniciada\n    flow.set('apiAuth', null);\n    return [continuar, log('token recusado, fazendo login de novo')];\n}\n\nswitch (msg.etapa) {\ncase 'login':\n    if (s === 200 && p && p.token) {\n        flow.set('apiAuth', { token: p.token, expira: Date.parse(p.expiraEm) });\n        return [continuar, log('login ok')];\n    }\n    node.status({ fill: 'red', shape: 'ring', text: 'login recusado: confira API_TELEFONE/API_SENHA' });\n    return [null, log('login recusado')];\n\ncase 'listar':\n    if (s === 200 && Array.isArray(p)) {\n        const codigo = fila[0] && fila[0].codigo;\n        p.forEach(d => { ids[d.codigo] = d.id; });\n        if (codigo && !(codigo in ids)) ids[codigo] = null;   // não existe: será criado\n        flow.set('apiDispositivos', ids);\n        return [continuar, log(`${p.length} dispositivo(s) na conta`)];\n    }\n    break;\n\ncase 'criar':\n    if (s === 201 && p && p.id) {\n        ids[p.codigo] = p.id;\n        flow.set('apiDispositivos', ids);\n        return [continuar, log(`dispositivo ${p.codigo} criado com id ${p.id}`)];\n    }\n    if (s === 409) {                                 // código já pertence a outra conta\n        const codigo = fila[0].codigo;\n        flow.set('apiFila', fila.filter(i => i.codigo !== codigo));\n        delete ids[codigo];\n        flow.set('apiDispositivos', ids);\n        node.status({ fill: 'red', shape: 'ring', text: `${codigo} pertence a outra conta` });\n        return [null, log(`${codigo} já está cadastrado em outra conta; leituras descartadas`)];\n    }\n    break;\n\ncase 'leitura':\n    if (s === 201) {\n        fila.shift();\n        flow.set('apiFila', fila);\n        node.status({ fill: 'green', shape: 'dot',\n                      text: `leitura ${p.id} · R$ ${p.custoEstimado} · ${fila.length} na fila` });\n        return [continuar, log(`leitura ${p.id} gravada: ${p.kwh} kWh, R$ ${p.custoEstimado}`)];\n    }\n    if (s === 404) {                                 // dispositivo apagado na API: descobre de novo\n        delete ids[fila[0].codigo];\n        flow.set('apiDispositivos', ids);\n        return [continuar, log('dispositivo não encontrado, procurando de novo')];\n    }\n    if (s === 400) {                                 // leitura recusada: não adianta repetir\n        const ruim = fila.shift();\n        flow.set('apiFila', fila);\n        node.warn({ recusada: ruim, resposta: p });\n        return [continuar, log('leitura recusada pela validação da API')];\n    }\n    break;\n}\n// Outros erros (500, 503...): mantém na fila e tenta no próximo tique\nnode.status({ fill: 'red', shape: 'ring', text: `erro ${s} em ${msg.etapa} · ${fila.length} na fila` });\nreturn [null, log('erro, tento de novo em 30 s')];\n",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "info": "Saída 1: volta para a fila (próxima requisição). Saída 2: registro legível para o debug.",
+    "x": 1500,
+    "y": 540,
+    "wires": [
+      [
+        "fn_api_fila"
+      ],
+      [
+        "dbg_api"
+      ]
+    ]
   },
   {
     "id": "dbg_api",
@@ -501,8 +575,8 @@
     "targetType": "full",
     "statusVal": "",
     "statusType": "counter",
-    "x": 1290,
-    "y": 540,
+    "x": 1510,
+    "y": 600,
     "wires": [],
     "z": "flow_medidor"
   },
@@ -519,7 +593,7 @@
     "libs": [],
     "info": "",
     "x": 730,
-    "y": 600,
+    "y": 640,
     "wires": [
       [
         "file_csv"
@@ -538,7 +612,7 @@
     "overwriteFile": "false",
     "encoding": "utf8",
     "x": 1030,
-    "y": 600,
+    "y": 640,
     "wires": [
       []
     ],

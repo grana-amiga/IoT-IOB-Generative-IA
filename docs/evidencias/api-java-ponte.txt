@@ -1,0 +1,52 @@
+Ponte Node-RED -> API Java (repositório grana-amiga/Java-Advanced, commit b8ea138)
+Data: 13/11/2026
+Ambiente: API rodando no PC com banco H2 em memória (mesma configuração dos testes do repositório Java),
+          Node-RED em Docker (API_URL=http://host.docker.internal:8080), tools/simulador_medidor.py
+          publicando no broker HiveMQ com o código GA-SIM-001 (250 W, 1,25 kWh por mensagem).
+Conta de teste criada só no H2 local (POST /api/v1/auth/cadastro); credenciais no node-red/.env, fora do Git.
+
+Consulta feita na própria API (login JWT -> GET /dispositivos, /leituras, /resumo).
+
+======================================================================
+CT-17  Caminho feliz + leituras que voltaram do buffer offline
+       python tools/simulador_medidor.py --intervalo 2 --offline 40-60
+======================================================================
+Simulador: {"enviadas": 123, "descartadas_de_proposito": 0, "presas_e_reenviadas": 21}
+
+Sequência vista na ponte: login -> listar (conta sem dispositivos) -> criar GA-SIM-001 -> leituras
+
+Dispositivo id=1 codigo=GA-SIM-001 tarifa=0.81885 meta=120.0   <- criado sozinho pela ponte
+  leitura   1 2026-11-13T08:18:12    250.0 W  37.500000 kWh  R$ 30.71
+  leitura   2 2026-11-13T08:19:12    250.0 W  37.500000 kWh  R$ 30.71
+  leitura   3 2026-11-13T08:20:12    250.0 W  37.500000 kWh  R$ 30.71
+  leitura   4 2026-11-13T08:21:12    250.0 W  37.500000 kWh  R$ 30.71
+  total: 4 leituras, soma 150.000000 kWh
+  resumo: totalKwh 150.0 · custoTotal 122.84 · percentualMeta 102.37 · faixa VERMELHO
+
+Conferência: base da ponte = 1,25 kWh (1ª leitura depois que o Node-RED subiu, não é enviada)
+             kWh acumulado do medidor na última janela fechada = 151,25
+             151,25 - 1,25 = 150,00 kWh = soma gravada na API  -> nenhuma leitura somada duas vezes,
+             mesmo com as 21 reenviadas do buffer chegando em rajada.
+             As 23 leituras da última janela (ainda aberta) vão na próxima leitura que chegar.
+
+======================================================================
+CT-18  API fora do ar: a fila do Node-RED segura e esvazia sozinha
+       API desligada -> python tools/simulador_medidor.py --intervalo 1.5 -> API religada
+======================================================================
+08:23:45 [error] [http request:API Java (msg.method + msg.url)] RequestError   <- API desligada
+08:23:51 [error] [http request:API Java (msg.method + msg.url)] RequestError
+Fila da ponte com a API fora:  2 leituras guardadas (contexto apiFila)
+08:24:33 API religada (H2 vazio) e conta recriada
+Sequência vista na ponte: leitura -> 404 (dispositivo não existe mais) -> listar -> criar -> leituras
+
+Dispositivo id=1 codigo=GA-SIM-001 tarifa=0.81885 meta=120.0
+  leitura   1 2026-11-13T08:22:51    250.0 W   1.250000 kWh  R$ 1.02    <- ficou na fila
+  leitura   2 2026-11-13T08:23:51    250.0 W  50.000000 kWh  R$ 40.94   <- ficou na fila
+  leitura   3 2026-11-13T08:24:51    250.0 W  50.000000 kWh  R$ 40.94
+  leitura   4 2026-11-13T08:25:51    250.0 W  50.000000 kWh  R$ 40.94
+  total: 4 leituras, soma 151.250000 kWh
+  resumo: totalKwh 151.25 · custoTotal 123.84 · percentualMeta 103.2 · faixa VERMELHO
+
+Conferência: o simulador recomeçou do zero (kWh 1,25 < base 151,25), a ponte tratou como medidor
+             reiniciado e voltou a base para 0. Acumulado do medidor na última janela fechada = 151,25
+             = soma gravada na API. Fila vazia no fim; nenhuma leitura perdida com a API fora do ar.

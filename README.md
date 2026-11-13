@@ -60,8 +60,8 @@ Corrente elétrica do quadro
   → Roteador da casa                     DHCP, NAT, DNS
   → Internet (TCP/IP)
   → Broker MQTT (HiveMQ, porta 1883)     publish/subscribe, tópicos por casa
-  → Node-RED (container Docker)          valida, mede entrega, dashboard, CSV, ponte HTTP
-  → API Java Spring Boot (VM Azure)      POST /api/leituras → PostgreSQL (leitura_energia)
+  → Node-RED (container Docker)          valida, mede entrega, dashboard, CSV, agrega 1 leitura/min
+  → API Java Spring Boot (Java-Advanced) JWT + POST /api/v1/dispositivos/{id}/leituras → Oracle
   → App Grana Amiga (Flutter)            REST + JWT: custo de luz e alerta de meta
 ```
 
@@ -77,7 +77,7 @@ E no sentido contrário: o dashboard (ou o app) publica em `…/config` e o ESP3
 | Roteador → Internet | Roteador doméstico | Ethernet/fibra/4G do provedor; **IP com NAT e DHCP** | O medidor recebe IP privado e sai pela internet da casa |
 | ESP32 ↔ broker | HiveMQ (público na demo) | **MQTT 3.1.1 sobre TCP, porta 1883**, mensagens JSON | Protocolo leve (cabeçalho de 2 bytes), feito para redes instáveis; publish/subscribe desacopla quem envia de quem recebe |
 | Broker → Node-RED | Node-RED em Docker | MQTT (assinatura `granaamiga/casa/+/#`) | Um fluxo atende várias casas pelo curinga `+` |
-| Node-RED → API | API Java (VM Azure, entrega DevOps) | **HTTP REST (JSON)** | A API já é o ponto central de dados do app |
+| Node-RED → API | API Java Spring Boot ([Java-Advanced](https://github.com/grana-amiga/Java-Advanced)) | **HTTP REST (JSON) + JWT** | A API já é o ponto central de dados do app; a ponte faz login com a conta da família e cadastra o medidor sozinha |
 | API → app | App Flutter | HTTP REST + **JWT** | Mesmo canal autenticado do resto do app |
 
 **Camadas:** enlace/físico = Wi-Fi · rede = IP · transporte = TCP · aplicação = MQTT e HTTP · dados = JSON.
@@ -169,13 +169,25 @@ Pré-requisito: Docker.
 
 ```bash
 cd node-red
-cp .env.example .env    # opcional: muda broker, código do medidor ou URL da API
+cp .env.example .env    # broker, código do medidor, URL e conta da API Java
 docker compose up -d --build
 ```
 
 - Dashboard: <http://localhost:1880/ui> · Editor: <http://localhost:1880>
 - Com o Wokwi rodando, as leituras aparecem no dashboard em segundos.
 - O formulário **"Ajustar medidor"** envia meta/tarifa/tensão para o ESP32 pelo tópico `…/config`.
+
+**Integração com a API Java** ([Java-Advanced](https://github.com/grana-amiga/Java-Advanced)):
+
+1. Suba a API (instruções no repositório dela) e crie a conta da família em `POST /api/v1/auth/cadastro`.
+2. No `node-red/.env`, preencha `API_TELEFONE` e `API_SENHA` com essa conta. Se a API roda no mesmo PC, fora do Docker, use `API_URL=http://host.docker.internal:8080`.
+3. Rode `docker compose up -d --build` de novo. Sem a conta preenchida, a ponte fica parada e o nó "Fila da API" mostra o aviso.
+
+Como a ponte funciona:
+
+- **Agrega 1 leitura por minuto.** O medidor publica a cada 5 s o kWh *acumulado do mês*, e a API soma o kWh de cada leitura no resumo mensal. Por isso a ponte envia só o consumo da janela (diferença de kWh) e a potência média. Mandar o acumulado faria a API somar o mesmo consumo várias vezes.
+- **Faz login (JWT) e descobre o id do medidor sozinha.** A rota da API usa o id numérico, e o medidor só conhece o código `GA-ESP32-001`. Se o medidor não existe na conta, a ponte cadastra com a tarifa e a meta que vieram na leitura.
+- **Guarda numa fila se a API cair** e tenta de novo a cada 30 s, a mesma ideia do buffer offline do ESP32.
 
 ### 4.3 Testar sem o Wokwi (simulador)
 
@@ -241,12 +253,15 @@ Resumo (detalhes, critérios, métricas e limitações em **[`docs/testes.md`](d
 | Detecção de perda (10% induzida) | ✅ 132 recebidas, **12 perdidas detectadas**, entrega 91,7% |
 | Reenvio após queda | ✅ 16 de 16, na ordem e sem duplicar |
 | Boot do ESP32 | ⚠️ travamento encontrado no teste e corrigido (NTP só após o Wi-Fi) |
+| Ponte para a API Java | ✅ login JWT, medidor cadastrado sozinho, kWh na API = kWh do medidor (sem somar duas vezes) |
+| API Java fora do ar | ✅ leituras ficaram na fila do Node-RED e foram gravadas quando a API voltou |
 
 | Evidência | Arquivo |
 | --- | --- |
 | Serial do Wokwi | [`docs/evidencias/serial-wokwi.txt`](docs/evidencias/serial-wokwi.txt) e reteste do boot e da chave offline em [`serial-wokwi-reteste.txt`](docs/evidencias/serial-wokwi-reteste.txt) |
 | Tráfego MQTT capturado por um assinante independente | [`docs/evidencias/mqtt-log.txt`](docs/evidencias/mqtt-log.txt) e reconexão depois de reinício em [`mqtt-log-reconexao.txt`](docs/evidencias/mqtt-log-reconexao.txt) |
 | Leituras gravadas pelo Node-RED | [`docs/evidencias/leituras-node-red.csv`](docs/evidencias/leituras-node-red.csv) |
+| Leituras gravadas na API Java | [`docs/evidencias/api-java-ponte.txt`](docs/evidencias/api-java-ponte.txt) |
 | Capturas do circuito e do dashboard | [`docs/evidencias/`](docs/evidencias/) |
 
 ![Dashboard Node-RED](docs/evidencias/04-dashboard-vermelho-alerta.jpg)
@@ -276,7 +291,7 @@ medidor_energia/
 ├── libraries.txt           bibliotecas
 └── secrets.example.h       modelo de credenciais (o secrets.h real não é versionado)
 node-red/
-├── flows.json              fluxo: validação, métricas, dashboard, CSV, comandos, ponte HTTP
+├── flows.json              fluxo: validação, métricas, dashboard, CSV, comandos, ponte para a API Java
 ├── Dockerfile              Node-RED + dashboard + fluxo
 ├── docker-compose.yml
 └── .env.example

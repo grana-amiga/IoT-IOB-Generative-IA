@@ -8,6 +8,7 @@ Os testes foram executados em **12/11/2026** em três ambientes:
 | **Wokwi** (ESP32 simulado + Wi-Fi virtual `Wokwi-GUEST`) | Firmware completo: leitura, cálculo, LCD, LED, buzzer, Wi-Fi, MQTT, buffer, comando remoto | `evidencias/serial-wokwi.txt`, `evidencias/serial-wokwi-reteste.txt`, `evidencias/01-*.jpg`, `evidencias/02-*.jpg`, `evidencias/05-*.png` |
 | **Broker público HiveMQ** + assinante independente (`mosquitto_sub`) | O que realmente trafegou na rede, com horário de chegada | `evidencias/mqtt-log.txt`, `evidencias/mqtt-log-reconexao.txt` |
 | **Node-RED** em container Docker + `tools/simulador_medidor.py` | Validação, métricas de entrega, perda, reenvio, dashboard, CSV | `evidencias/leituras-node-red.csv`, `evidencias/03-*.jpg`, `evidencias/04-*.jpg` |
+| **API Java** (repositório Java-Advanced, H2 em memória) + Node-RED + simulador — 13/11/2026 | Ponte HTTP: login JWT, cadastro do medidor, gravação das leituras, fila com a API fora do ar | `evidencias/api-java-ponte.txt` |
 
 > O simulador em Python usa **as mesmas fórmulas e o mesmo JSON** do firmware. Ele existe para testar a parte de rede e nuvem sem depender do Wokwi, que roda mais devagar que o tempo real (ver Limitações).
 
@@ -47,6 +48,8 @@ Os testes foram executados em **12/11/2026** em três ambientes:
 | CT-14 | Chave "sem internet" | Mover a chave deslizante com o medidor conectado | `[TESTE] Chave offline LIGADA`, ícone X no LCD, leituras no buffer; ao voltar, reenvio | Leituras #6 a #10 no buffer (5/60), ícone X no LCD (`05-wokwi-offline-buffer.png`), broker publicou `offline` na hora. Ao desligar a chave: reconexão e reenvio de `seq` 6 a 10 **na ordem**, `"reenvio":true`, `buffer_pendente` 4 → 0; `seq` 11 volta ao fluxo normal | ✅ |
 | CT-15 | Primeira leitura após o boot | Observar a `seq` 1 no reteste | Valores reais de corrente, kWh e custo | **Bug encontrado:** a `seq` 1 saía com tudo zerado, porque era registrada no 1º `loop()`, antes da 1ª medição (`ultimaPublicacao` começava em 0). Corrigido: os relógios de leitura e publicação começam juntos no `setup()`. Depois: `seq` 1 com `2.71 A`, `1.555 kWh`, `R$ 1.27` | ✅ corrigido e verificado |
 | CT-16 | Status depois de um reinício rápido (luz pisca) | Parar a simulação e religar em poucos segundos; assinante externo por 100 s | Status retido termina `online` | **Bug encontrado:** com client ID aleatório, o Last Will da sessão morta chegava ~90 s **depois** do `online` novo e o status ficava `offline` com o medidor funcionando. Corrigido: client ID fixo `granaamiga-GA-ESP32-001`; o broker derruba a sessão antiga na hora. Depois: `offline` 22:26:59 → `online` 22:27:00, nenhum `offline` atrasado, status retido `online` (`mqtt-log-reconexao.txt`) | ✅ corrigido e verificado |
+| CT-17 | Ponte para a API Java | Simulador com `--offline 40-60` e API do repositório Java-Advanced rodando (H2) | A ponte faz login, cadastra o medidor e grava 1 leitura por minuto sem somar kWh duas vezes | Login → dispositivo `GA-SIM-001` criado sozinho → 4 leituras de 37,5 kWh. Soma na API **150,00 kWh** = acumulado do medidor na última janela (151,25) − base (1,25), mesmo com 21 reenvios do buffer chegando juntos. Resumo da API: R$ 122,84, `VERMELHO` (`api-java-ponte.txt`) | ✅ |
+| CT-18 | API fora do ar | Desligar a API, mandar leituras, religar a API | Leituras ficam na fila do Node-RED e são gravadas quando a API volta | `RequestError` no Node-RED, 2 leituras na fila. API religada com banco vazio: a ponte recebeu 404, cadastrou o medidor de novo e esvaziou a fila. Soma na API **151,25 kWh** = acumulado do medidor; nenhuma leitura perdida (`api-java-ponte.txt`) | ✅ |
 
 ### Como reproduzir os testes
 
@@ -91,7 +94,8 @@ python tools/simulador_medidor.py --potencia 230 --perder-a-cada 10 --offline 40
 | **Sem bateria** | Queda de energia na casa desliga o medidor | Supercapacitor/bateria pequena para registrar a queda |
 | **Mede o quadro inteiro** | Não sabe qual aparelho gasta mais | Desagregação de carga com IA a partir do perfil de consumo (evolução IoB) |
 | **Simulação mais lenta que o tempo real no Wokwi** (3% a 30%) | O broker conta o keep-alive em tempo real e derruba a sessão; por isso o keep-alive subiu para 60 s | No físico não acontece; no Wokwi, manter a aba em primeiro plano |
-| **Ponte HTTP para a API Java desativada** | As leituras ainda não chegam ao PostgreSQL | Ativar o nó quando a API publicar `POST /api/leituras` (contrato já montado no nó "Montar leitura_energia") |
+| **Ponte guarda o estado na memória do Node-RED** | Se o Node-RED reiniciar, a fila da API se perde e a 1ª leitura depois vira a nova base (o consumo entre a última janela enviada e o reinício não vai para a API) | Contexto persistente do Node-RED (`contextStorage` em arquivo) ou a API aceitar o kWh acumulado e calcular a diferença ela mesma |
+| **Última janela só fecha com a leitura seguinte** | Quando o medidor para de enviar, o último minuto fica no Node-RED até a próxima leitura | Aceitável: o medidor real envia o tempo todo; ao voltar, o consumo entra na janela seguinte, sem perda |
 
 ### Segurança elétrica
 O SCT-013 é um **alicate não invasivo**: abraça um dos fios do quadro sem cortar nem desencapar. Nunca usar sensores em série com a rede (como o ACS712) para medir a casa inteira. A instalação real deve ser feita por eletricista.

@@ -306,7 +306,7 @@ docs/
 
 ## 9. Uso de IA generativa
 
-O grupo usou o **Claude (Anthropic)** como apoio para revisar o firmware, montar o fluxo do Node-RED, gerar o diagrama e organizar a documentação. O código foi executado no Wokwi, no Node-RED (Docker) e no broker MQTT público, e os resultados registrados em `docs/testes.md` vêm dessas execuções. O grupo revisou o conteúdo e responde por todas as decisões técnicas.
+Durante o desenvolvimento do projeto, o grupo utilizou o Claude (Anthropic) como ferramenta de apoio em algumas etapas, incluindo a revisão do firmware, a estruturação do fluxo no Node-RED, a elaboração do diagrama e a organização da documentação. As implementações foram testadas e validadas pelo grupo no Wokwi, no Node-RED (Docker) e no broker MQTT público. Os resultados apresentados em `docs/testes.md` correspondem aos testes realizados durante o desenvolvimento. O grupo analisou, revisou e ajustou as soluções propostas, sendo responsável pelas decisões técnicas e pelo resultado final do projeto.
 
 ---
 
